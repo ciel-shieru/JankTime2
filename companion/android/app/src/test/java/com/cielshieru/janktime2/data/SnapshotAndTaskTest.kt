@@ -7,6 +7,19 @@ import org.junit.Test
 
 class SnapshotAndTaskTest {
     @Test
+    fun refreshReportExplainsDeliveryAndUnavailableSourcesWithoutProviderDetails() {
+        assertEquals(
+            "Refresh complete. The latest data snapshot was sent to the watch.",
+            RefreshReport(emptyList()).userMessage(),
+        )
+        val report = RefreshReport(listOf("Home Assistant", "Prometheus", "Home Assistant"))
+        val message = report.userMessage()
+        assertTrue(message.contains("Home Assistant, Prometheus"))
+        assertTrue(message.contains("Watch updated where data is available"))
+        assertTrue(!message.contains("token") && !message.contains("https://"))
+    }
+
+    @Test
     fun metricSanitizationIsBoundedAndStalenessIsTracked() {
         val snapshot = WatchSnapshot()
             .withMetric("cpuUsage", "10%\u202e")

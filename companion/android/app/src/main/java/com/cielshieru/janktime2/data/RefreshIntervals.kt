@@ -34,13 +34,19 @@ class SnapshotRefresher(private val context: Context) {
         var snapshot = snapshotStore.load()
         val now = Clock.systemUTC().millis()
         val credentials = secrets
+        val unavailableSources = linkedSetOf<String>()
 
         if (due(snapshot, "phone", 5) || forceRefresh) {
             snapshot = snapshot.attempted("phone", now)
             val manager = context.getSystemService(Context.BATTERY_SERVICE) as? BatteryManager
             val level = manager?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
                 ?.takeIf { it in 0..100 }
-            snapshot = if (level != null) snapshot.copy(phoneBatteryPercent = level) else snapshot.markStale(listOf("phoneBattery"))
+            snapshot = if (level != null) {
+                snapshot.copy(phoneBatteryPercent = level)
+            } else {
+                unavailableSources += "Phone battery"
+                snapshot.markStale(listOf("phoneBattery"))
+            }
             val connected = runCatching {
                 DefaultPebbleInfoRetriever(context).getConnectedWatches().first().isNotEmpty()
             }.getOrNull()
@@ -52,6 +58,9 @@ class SnapshotRefresher(private val context: Context) {
             snapshot = snapshot.attempted("homeAssistant", now)
             try {
                 val base = config.homeAssistantUrl
+                val hasEntity = listOf(config.sensorEntity, config.waterEntity, config.weatherEntity, config.climateEntity)
+                    .any { it.isNotBlank() }
+                if (base.isBlank() || !hasEntity) throw IllegalStateException("Home Assistant is not configured.")
                 val token = credentials.get("home_assistant")
                     ?: throw IllegalStateException("Home Assistant token is not configured.")
                 val metrics = mutableMapOf<String, String>()
@@ -86,6 +95,7 @@ class SnapshotRefresher(private val context: Context) {
                 for ((id, value) in metrics) snapshot = snapshot.withMetric(id, value)
                 snapshot = snapshot.succeeded("homeAssistant", now)
             } catch (_: Exception) {
+                unavailableSources += "Home Assistant"
                 snapshot = snapshot.markStale(listOf("fanState", "water", "haClimateValue", "weatherFeelsLike", "rainChance"))
             }
         }
@@ -95,6 +105,8 @@ class SnapshotRefresher(private val context: Context) {
             try {
                 val token = credentials.get("prometheus")
                 val base = config.prometheusUrl
+                val hasQuery = listOf(config.cpuQuery, config.memoryQuery, config.alertQuery).any { it.isNotBlank() }
+                if (base.isBlank() || !hasQuery) throw IllegalStateException("Prometheus is not configured.")
                 if (config.cpuQuery.isNotBlank()) {
                     val value = prometheus.instantQuery(base, config.cpuQuery, token)
                     snapshot = if (value != null) snapshot.withMetric("cpuUsage", value)
@@ -112,6 +124,7 @@ class SnapshotRefresher(private val context: Context) {
                 }
                 snapshot = snapshot.succeeded("prometheus", now)
             } catch (_: Exception) {
+                unavailableSources += "Prometheus"
                 snapshot = snapshot.markStale(listOf("cpuUsage", "memoryUsage", "alertCount"))
             }
         }
@@ -126,6 +139,7 @@ class SnapshotRefresher(private val context: Context) {
                 snapshot = snapshot.copy(focusRows = listOf(result.rows.getOrNull(0), result.rows.getOrNull(1)))
                 snapshot = snapshot.succeeded("mindwtr", now)
             } catch (_: Exception) {
+                unavailableSources += "Mindwtr"
                 snapshot = snapshot.markStale(listOf("focusCount"))
             }
         }
@@ -140,6 +154,7 @@ class SnapshotRefresher(private val context: Context) {
                     snapshot = snapshot.succeeded("wakey", now)
                 }
             } catch (_: Exception) {
+                unavailableSources += "Wakey-SITizen"
                 // Preserve last-known-good alarm/bedtime on failures.
             }
         }
@@ -151,6 +166,7 @@ class SnapshotRefresher(private val context: Context) {
                 snapshot = snapshot.copy(calendarRows = listOf(events.getOrNull(0)?.displayRow(), events.getOrNull(1)?.displayRow()))
                 snapshot = snapshot.succeeded("calendar", now)
             } catch (_: Exception) {
+                unavailableSources += "Phone calendar"
                 // Preserve last-known-good calendar rows on failures.
             }
         }
@@ -159,6 +175,7 @@ class SnapshotRefresher(private val context: Context) {
         PebbleBridge(context).use { bridge ->
             bridge.send(snapshot, config)
         }
+        RefreshReport(unavailableSources.toList())
     }
 
     private fun due(snapshot: WatchSnapshot, source: String, intervalMinutes: Int): Boolean {

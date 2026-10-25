@@ -21,6 +21,8 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 - A native Android companion is required for Android-only data that PebbleKit JS cannot obtain: selected Android Calendar Provider events, phone battery readings, and the explicit Wakey-SITizen export. Do not add src/pkjs/index.js: PebbleKit JS and PebbleKit Android are mutually exclusive phone-side bridges for one watch project. All provider traffic and Android-only integration must go through the native companion boundary documented by the ADRs.
 - The Pebble mobile app's calendar-to-Timeline sync is not a replacement for Calendar Provider access: the documented Timeline APIs do not expose a query API for reading the app's already-synced calendar pins into the running watchface.
 - The app sends only display-ready, bounded data to the watch. Never send endpoint credentials, bearer tokens, certificates, or full unfiltered provider responses over AppMessage.
+- Refresh status must be visible in the companion UI. Do not silently discard all provider failures or report refresh success before a watch-send acknowledgement is received. Saving configuration must trigger a refresh, not only schedule later work.
+- PebbleKit Android 2 has an unbind-on-close edge case when no binding was established; keep the sender lazy and suppress only the exact `Service not registered` `IllegalArgumentException` during cleanup. Do not suppress transmission errors.
 - The watchface must remain useful offline. Keep the last successful snapshot, show stale data when refresh fails, and turn affected metric icons red while stale.
 
 ## Android companion implementation rules

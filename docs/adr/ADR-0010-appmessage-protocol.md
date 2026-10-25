@@ -23,9 +23,9 @@ See docs/integrations/appmessage-protocol.md for packet definitions.
 
 - New packet types require a protocol/ADR update and tests.
 - Invalid messages are ignored without modifying display state.
-- The app must split updates into small messages and handle native transport acknowledgement/backpressure.
+- The app splits updates into small messages and handles native transport acknowledgement/backpressure. The companion surfaces missing bridge selection and provider refresh failures instead of silently reporting success.
 - AppMessage is not used to transport credentials or whole provider responses.
-- Live integration remains pending until the native Android companion sender and end-to-end tests are added.
+- CI validates bounded message handling and screenshot output, but a physical-watch test is still required to verify the installed mobile-app relay end to end.
 
 ## References
 

@@ -40,7 +40,6 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import androidx.lifecycle.lifecycleScope
 import com.cielshieru.janktime2.config.CompanionConfig
 import com.cielshieru.janktime2.config.ConfigStore
 import com.cielshieru.janktime2.config.RegexFilter
@@ -75,9 +74,9 @@ class MainActivity : ComponentActivity() {
                             RefreshScheduler(this).scheduleNext(1L, ExistingWorkPolicy.REPLACE)
                         },
                         onRefresh = {
-                            lifecycleScope.launch(Dispatchers.IO) {
-                                SnapshotRefresher(applicationContext).refreshAndSend(forceRefresh = true)
-                            }
+                            val report = SnapshotRefresher(applicationContext).refreshAndSend(forceRefresh = true)
+                            RefreshScheduler(applicationContext).scheduleNext(existingWorkPolicy = ExistingWorkPolicy.REPLACE)
+                            report.userMessage()
                         },
                         onLoadCalendars = {
                             if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_CALENDAR) ==
@@ -85,12 +84,13 @@ class MainActivity : ComponentActivity() {
                             ) CalendarReader(this).listCalendars() else emptyList()
                         },
                         onSelectPebbleApp = { packageName ->
-                            lifecycleScope.launch {
-                                PebbleBridge(this@MainActivity).use { it.selectPebbleApp(packageName) }
-                            }
+                            PebbleBridge(applicationContext).use { it.selectPebbleApp(packageName) }
                         },
                         onListPebbleApps = {
-                            PebbleBridge(this).use { it.availablePebbleApps() }
+                            PebbleBridge(applicationContext).use { it.availablePebbleApps() }
+                        },
+                        onGetSelectedPebbleApp = {
+                            PebbleBridge(applicationContext).use { it.selectedPebbleApp() }
                         },
                         onChooseImage = { uri ->
                             val rows = withContext(Dispatchers.IO) { imageStore.importFromUri(uri) }
@@ -116,10 +116,11 @@ private data class SecretInputs(
 private fun CompanionSettingsScreen(
     initial: CompanionConfig,
     onSave: (CompanionConfig, Map<String, String>) -> Unit,
-    onRefresh: () -> Unit,
+    onRefresh: suspend () -> String,
     onLoadCalendars: suspend () -> List<DeviceCalendar>,
-    onSelectPebbleApp: (String?) -> Unit,
+    onSelectPebbleApp: suspend (String?) -> Unit,
     onListPebbleApps: suspend () -> List<String>,
+    onGetSelectedPebbleApp: suspend () -> String?,
     onChooseImage: suspend (android.net.Uri) -> Unit,
 ) {
     val context = LocalContext.current
@@ -149,6 +150,7 @@ private fun CompanionSettingsScreen(
 
     LaunchedEffect(Unit) {
         pebbleApps = runCatching { onListPebbleApps() }.getOrDefault(emptyList())
+        selectedPebblePackage = runCatching { onGetSelectedPebbleApp() }.getOrNull()
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CALENDAR) == PackageManager.PERMISSION_GRANTED) {
             calendars = runCatching { onLoadCalendars() }.getOrDefault(emptyList())
         }
@@ -165,7 +167,14 @@ private fun CompanionSettingsScreen(
         )
 
         Text("Pebble mobile app", style = MaterialTheme.typography.titleMedium)
-        OutlinedButton(onClick = { scope.launch { pebbleApps = runCatching { onListPebbleApps() }.getOrDefault(emptyList()) } }) {
+        Text("Selected bridge: " + (selectedPebblePackage ?: "none"), style = MaterialTheme.typography.bodySmall)
+        if (pebbleApps.isEmpty()) {
+            Text("No compatible PebbleKit Android 2 service was found. Install or enable the Pebble mobile app or a compatible Gravel release.", style = MaterialTheme.typography.bodySmall)
+        }
+        OutlinedButton(onClick = { scope.launch {
+            pebbleApps = runCatching { onListPebbleApps() }.getOrDefault(emptyList())
+            selectedPebblePackage = runCatching { onGetSelectedPebbleApp() }.getOrNull()
+        } }) {
             Text("Refresh available Pebble apps")
         }
         pebbleApps.forEach { pkg ->
@@ -173,7 +182,18 @@ private fun CompanionSettingsScreen(
                 Checkbox(checked = selectedPebblePackage == pkg, onCheckedChange = { selectedPebblePackage = pkg })
                 Text(pkg)
                 Spacer(Modifier.weight(1f))
-                Button(onClick = { onSelectPebbleApp(pkg); notice = "Selected Pebble mobile app." }) { Text("Select") }
+                Button(onClick = {
+                    scope.launch {
+                        runCatching { onSelectPebbleApp(pkg) }
+                            .onSuccess {
+                                selectedPebblePackage = pkg
+                                notice = "Selected Pebble bridge: " + pkg
+                            }
+                            .onFailure { failure ->
+                                notice = "Could not select Pebble bridge: " + (failure.message ?: "unknown error")
+                            }
+                    }
+                }) { Text(if (selectedPebblePackage == pkg) "Selected" else "Select") }
             }
         }
 
@@ -274,29 +294,50 @@ private fun CompanionSettingsScreen(
 
         Button(
             onClick = {
-                runCatching {
-                    RefreshIntervals.validate(config.refreshHomeAssistantMinutes)
-                    RefreshIntervals.validate(config.refreshPrometheusMinutes)
-                    RefreshIntervals.validate(config.refreshMindwtrMinutes)
-                    RefreshIntervals.validate(config.refreshWakeyMinutes)
-                    RegexFilter.validate(config.calendarBlocklist)
-                    onSave(
-                        config,
-                        mapOf(
-                            "home_assistant" to secrets.homeAssistant,
-                            "prometheus" to secrets.prometheus,
-                            "mindwtr" to secrets.mindwtr,
-                            "wakey_pairing" to secrets.wakeyPairing,
-                        ),
-                    )
-                }.onSuccess { notice = "Configuration saved." }
-                    .onFailure { notice = it.message ?: "Configuration is invalid." }
+                scope.launch {
+                    var saved = false
+                    try {
+                        RefreshIntervals.validate(config.refreshHomeAssistantMinutes)
+                        RefreshIntervals.validate(config.refreshPrometheusMinutes)
+                        RefreshIntervals.validate(config.refreshMindwtrMinutes)
+                        RefreshIntervals.validate(config.refreshWakeyMinutes)
+                        RegexFilter.validate(config.calendarBlocklist)
+                        onSave(
+                            config,
+                            mapOf(
+                                "home_assistant" to secrets.homeAssistant,
+                                "prometheus" to secrets.prometheus,
+                                "mindwtr" to secrets.mindwtr,
+                                "wakey_pairing" to secrets.wakeyPairing,
+                            ),
+                        )
+                        saved = true
+                        notice = "Configuration saved. Refreshing providers and updating the watch…"
+                        notice = "Configuration saved. " + onRefresh()
+                    } catch (failure: Exception) {
+                        val message = failure.message ?: "unknown error"
+                        notice = if (saved) "Configuration saved, but refresh failed: " + message.take(180)
+                            else message.take(180).ifBlank { "Configuration is invalid." }
+                    }
+                }
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text("Save configuration")
         }
-        OutlinedButton(onClick = { onRefresh(); notice = "Refresh requested." }, modifier = Modifier.fillMaxWidth()) {
+        OutlinedButton(
+            onClick = {
+                scope.launch {
+                    notice = "Refreshing providers and updating the watch…"
+                    try {
+                        notice = onRefresh()
+                    } catch (failure: Exception) {
+                        notice = "Refresh failed: " + (failure.message ?: "unknown error").take(180)
+                    }
+                }
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
             Text("Refresh data now")
         }
         if (notice.isNotBlank()) Text(notice, style = MaterialTheme.typography.bodyMedium)

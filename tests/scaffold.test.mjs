@@ -51,7 +51,13 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(renderer, /new render\.Font\(bold \? "Gothic-Bold" : "Gothic-Regular", size\)/);
     assert.match(renderer, /systemFont\(14\)/);
     assert.match(renderer, /systemFont\(9\)/);
-    assert.match(renderer, /systemFont\(28\)/);
+    assert.ok(renderer.includes('new render.Font("Leco-Bold", 36)'), "Clock must use the 36px Leco bold-numbers system font");
+    assert.match(renderer, /centered\(formatTime24\(lastDate\), clockFont, black, 100, 124\)/);
+    assert.match(renderer, /drawBaseline\(String\(minimum\) \+ "\/" \+ String\(maximum\), smallFont, black, 168, 147\)/);
+    assert.match(renderer, /MDI Light alarm outline/);
+    assert.match(renderer, /Scaled MDI Light bluetooth glyph/);
+    assert.match(renderer, /centered\(safe === null \? "--" : String\(safe\)/);
+    assert.doesNotMatch(renderer, /String\(safe\) \+ "%"/);
     assert.match(renderer, /const bluetoothConnected = watch\.connected\.app/);
     assert.match(renderer, /baselineY - font\.height/);
     const configSource = read("../src/ts/watch/config.ts");

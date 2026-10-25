@@ -26,7 +26,7 @@ function systemFont(size: 9 | 14 | 18 | 24 | 28 | 36, bold = false): PocoFont {
 const statusFont = systemFont(14);
 const valueFont = systemFont(14);
 const smallFont = systemFont(9);
-const clockFont = systemFont(28);
+const clockFont = new render.Font("Leco-Bold", 36);
 
 let lastDate = new Date();
 let watchBatteryPercent: number | null = null;
@@ -69,27 +69,30 @@ function labelDate(date: Date): string {
     const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
     return days[date.getDay()] + " " + months[date.getMonth()] + " " + date.getDate();
 }
+// Compact, one-pixel MDI Light-style raster icons for the 200×228 display.
 function drawAlarm(cx: number, cy: number, color: unknown): void {
-    ring(cx, cy, 5, color, 1);
-    line(cx, cy, cx, cy - 3, color);
+    // MDI Light alarm outline, reduced to a 10px-tall glyph in the status bar.
+    ring(cx, cy, 3, color, 1);
+    line(cx, cy, cx, cy - 2, color);
     line(cx, cy, cx + 2, cy + 1, color);
-    line(cx - 4, cy - 6, cx - 6, cy - 8, color);
-    line(cx + 4, cy - 6, cx + 6, cy - 8, color);
-    line(cx - 2, cy + 6, cx - 3, cy + 8, color);
-    line(cx + 2, cy + 6, cx + 3, cy + 8, color);
+    line(cx - 2, cy - 3, cx - 4, cy - 5, color);
+    line(cx + 2, cy - 3, cx + 4, cy - 5, color);
+    line(cx - 2, cy + 3, cx - 3, cy + 5, color);
+    line(cx + 2, cy + 3, cx + 3, cy + 5, color);
 }
 function drawBluetooth(cx: number, cy: number, color: unknown): void {
-    line(cx, cy - 7, cx, cy + 7, color, 2);
-    line(cx, cy - 7, cx + 5, cy - 2, color, 2);
-    line(cx + 5, cy - 2, cx - 4, cy + 4, color, 2);
-    line(cx - 4, cy - 4, cx + 5, cy + 3, color, 2);
-    line(cx + 5, cy + 3, cx, cy + 7, color, 2);
+    // Scaled MDI Light bluetooth glyph; single-pixel strokes keep it visually light.
+    line(cx, cy - 5, cx, cy + 5, color);
+    line(cx, cy - 5, cx + 4, cy - 1, color);
+    line(cx + 4, cy - 1, cx - 3, cy + 3, color);
+    line(cx - 3, cy - 3, cx + 4, cy + 2, color);
+    line(cx + 4, cy + 2, cx, cy + 5, color);
 }
 function drawBattery(x: number, y: number, width: number, percent: number | null, color: unknown): void {
     render.frameRoundRect(x, y, width - 3, 12, color, 1);
     render.drawRoundRect(x + width - 3, y + 3, 3, 6, color, 1);
     const safe = percent === null ? null : Math.max(0, Math.min(100, Math.trunc(percent)));
-    centered(safe === null ? "--%" : String(safe) + "%", smallFont, black, x + Math.floor((width - 3) / 2), y + 10);
+    centered(safe === null ? "--" : String(safe), smallFont, black, x + Math.floor((width - 3) / 2), y + 10);
 }
 function drawMetricIcon(metric: MetricId, cx: number, cy: number, stale: boolean): void {
     const color = stale ? red : blue;
@@ -330,9 +333,9 @@ function drawHeartRate(): void {
             line(px, py, x, y, graphFresh ? blue : red);
             px = x; py = y;
         }
-        centered(String(minimum) + "/" + String(maximum), smallFont, black, 179, 138);
+        drawBaseline(String(minimum) + "/" + String(maximum), smallFont, black, 168, 147);
     } else {
-        centered("--/--", smallFont, black, 179, 138);
+        drawBaseline("--/--", smallFont, black, 168, 147);
     }
 }
 function drawRows(): void {
@@ -369,8 +372,8 @@ function drawStatus(date: Date): void {
     // Do not mark it red merely because an optional phone-status payload is absent.
     const bluetoothConnected = watch.connected.app;
     drawBluetooth(111, 10, bluetoothConnected ? blue : red);
-    drawBattery(126, 4, 32, displayState.phoneBatteryPercent ?? (PREVIEW_MODE ? previewPhoneBatteryPercent : null), yellow);
-    drawBattery(163, 4, 34, watchBatteryPercent, blue);
+    drawBattery(134, 4, 27, displayState.phoneBatteryPercent ?? (PREVIEW_MODE ? previewPhoneBatteryPercent : null), yellow);
+    drawBattery(170, 4, 27, watchBatteryPercent, blue);
     line(5, 20, 195, 20, black);
 }
 function draw(event?: AlloyWatchMinuteEvent): void {
@@ -392,7 +395,7 @@ function draw(event?: AlloyWatchMinuteEvent): void {
     drawMetric("grid.bottom.4", 140, 68, 94, 36);
     drawMetric("grid.bottom.5", 180, 68, 94, 36);
 
-    centered(formatTime24(lastDate), clockFont, black, 100, 116);
+    centered(formatTime24(lastDate), clockFont, black, 100, 124);
     drawMetric("clock.left", 20, 123, 142, 36);
     drawMetric("clock.right", 180, 123, 142, 36);
     drawHeartRate();

@@ -16,7 +16,11 @@ import java.util.UUID
 class PebbleBridge(context: Context) : AutoCloseable {
     private val appContext = context.applicationContext
     private val picker: PebbleAndroidAppPicker = DefaultPebbleAndroidAppPicker.getInstance(appContext)
-    private val sender = DefaultPebbleSender(appContext)
+    // PebbleKit Android 2 closes by unbinding unconditionally, even when its connection never bound.
+    // Keep the sender lazy so app-picker operations do not create an unbound ServiceConnection.
+    private val senderDelegate = lazy(LazyThreadSafetyMode.NONE) { DefaultPebbleSender(appContext) }
+    private val sender by senderDelegate
+    private var senderUsed = false
 
     init {
         // Auto-selecting an arbitrary service is unsafe for a watchface carrying private data.
@@ -26,6 +30,8 @@ class PebbleBridge(context: Context) : AutoCloseable {
     suspend fun availablePebbleApps(): List<String> =
         picker.getAllEligibleApps().filter { it.length <= 200 }.take(20).sorted()
 
+    suspend fun selectedPebbleApp(): String? = picker.getCurrentlySelectedApp()
+
     suspend fun selectPebbleApp(packageName: String?) {
         require(packageName == null || packageName in availablePebbleApps()) {
             "Select an installed Pebble mobile app."
@@ -34,7 +40,9 @@ class PebbleBridge(context: Context) : AutoCloseable {
     }
 
     suspend fun send(snapshot: com.cielshieru.janktime2.data.WatchSnapshot, config: com.cielshieru.janktime2.config.CompanionConfig) {
-        if (picker.getCurrentlySelectedApp() == null) return
+        if (picker.getCurrentlySelectedApp() == null) {
+            throw IOException("No Pebble mobile app is selected. Select the installed Pebble or compatible Gravel app before refreshing.")
+        }
 
         for ((slot, metric) in config.metricSlots) {
             sendMessage("slot", slot, metric)
@@ -69,7 +77,9 @@ class PebbleBridge(context: Context) : AutoCloseable {
         require(rows.size == 30 && rows.all { it.matches(Regex("[01]{30}")) }) {
             "Image must be downscaled to a 30 by 30 one-bit map before transfer."
         }
-        if (picker.getCurrentlySelectedApp() == null) return
+        if (picker.getCurrentlySelectedApp() == null) {
+            throw IOException("No Pebble mobile app is selected. Select the installed Pebble or compatible Gravel app before sending an image.")
+        }
         rows.chunked(3).forEachIndexed { chunkIndex, chunk ->
             val value = chunk.joinToString(";")
             sendMessage("image", "chunk." + chunkIndex, value, flags = 0)
@@ -101,6 +111,7 @@ class PebbleBridge(context: Context) : AutoCloseable {
         require(wireBytes <= MAX_APP_MESSAGE_BYTES) {
             "AppMessage payload exceeds the supported dictionary size."
         }
+        senderUsed = true
         val result = sender.sendDataToPebble(WATCHFACE_UUID, values)
         if (result.isNullOrEmpty() || result.values.any { it !== TransmissionResult.Success }) {
             throw IOException("Pebble message was not delivered. Check watch connectivity and ensure JankTime2 is foregrounded.")
@@ -108,7 +119,14 @@ class PebbleBridge(context: Context) : AutoCloseable {
     }
 
     override fun close() {
-        sender.close()
+        if (!senderDelegate.isInitialized() || !senderUsed) return
+        try {
+            sender.close()
+        } catch (failure: IllegalArgumentException) {
+            // PebbleKit Android 2 may try to unbind a connection after bindService failed
+            // or after the underlying service already unbound it. Ignore only this cleanup error.
+            if (failure.message != "Service not registered") throw failure
+        }
     }
 
     companion object {
