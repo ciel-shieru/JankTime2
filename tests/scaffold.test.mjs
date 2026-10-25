@@ -16,7 +16,7 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     const layout = read("../docs/design/layout.md");
     assert.match(layout, /eleven configurable metric slots/i);
     assert.match(layout, /grid\.bottom\.3/);
-    assert.match(layout, /without ellipses/i);
+    assert.match(layout, /ellipsis/i);
     assert.match(layout, /HH:mm/);
 });
 
