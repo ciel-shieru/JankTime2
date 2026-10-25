@@ -20,6 +20,8 @@ export interface BridgeDisplayState {
     calendarRows: [string | null, string | null];
     currentBpm: number | null;
     heartSamples: number[] | null;
+    weatherCondition: string | null;
+    imageRows: string[] | null;
 }
 
 export const displayState: BridgeDisplayState = {
@@ -34,6 +36,8 @@ export const displayState: BridgeDisplayState = {
     calendarRows: [null, null],
     currentBpm: null,
     heartSamples: null,
+    weatherCondition: null,
+    imageRows: null,
 };
 
 type MessageValue = string | number;
