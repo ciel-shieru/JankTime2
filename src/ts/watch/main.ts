@@ -128,7 +128,7 @@ function drawBluetooth(cx: number, cy: number, color: unknown): void {
 }
 function drawBattery(x: number, y: number, width: number, percent: number | null, color: unknown): void {
     const height = 12;
-    drawMdiGlyph(x + Math.floor(width / 2), y + Math.floor(height / 2), color, "battery-horizontal", width, height);
+    drawMdiGlyph(x + Math.floor(width / 2), y + Math.floor(height / 2), color, "battery-outline", width, height);
     const safe = percent === null ? null : Math.max(0, Math.min(100, Math.trunc(percent)));
     centeredAtY(safe === null ? "--" : String(safe), smallFont, black, x + Math.floor(width / 2), y + Math.floor(height / 2));
 }
@@ -143,7 +143,7 @@ function drawMetricIcon(metric: MetricId, cx: number, cy: number, stale: boolean
         case "fanState": icon = "fan"; break;
         case "cpuUsage": icon = "cpu-64-bit"; break;
         case "memoryUsage": icon = "memory"; break;
-        case "weatherFeelsLike": icon = weatherIcon(displayState.weatherCondition); break;
+        case "weatherFeelsLike": icon = weatherIcon(PREVIEW_MODE ? (displayState.weatherCondition ?? "partlycloudy") : displayState.weatherCondition); break;
         case "rainChance": icon = "weather-rainy"; break;
         case "alertCount": icon = "bell-alert-outline"; break;
         case "water": icon = "water-percent"; break;

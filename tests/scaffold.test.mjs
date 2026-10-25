@@ -57,11 +57,14 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(renderer, /drawBaseline\(String\(minimum\) \+ "\/" \+ String\(maximum\), smallFont, black, 168, 147\)/);
     const mdi = read("../src/ts/watch/mdi-icons.ts");
     assert.ok(mdi.includes("export const MDI_ICON_MASKS"));
+    assert.ok(existsSync(new URL("../third-party-notices/MaterialDesign-SVG-LICENSE.txt", import.meta.url)), "The MDI license notice must ship with the raster masks.");
     const iconLines = mdi.split("\n").filter((line) => line.trim().startsWith('"'));
     assert.equal(iconLines.length, 25);
     assert.ok(iconLines.every((line) => line.split('"')[3]?.length === 64), "Each MDI glyph must be a bounded 16×16 mask");
     assert.ok(renderer.includes("function drawMdiGlyph"));
     assert.ok(renderer.includes("function weatherIcon"));
+    assert.ok(renderer.includes('"battery-outline", width, height'), "Battery glyph must use the horizontal MDI outline mask.");
+    assert.ok(renderer.includes('PREVIEW_MODE ? (displayState.weatherCondition ?? "partlycloudy")'), "Preview should use a real MDI weather condition.");
     assert.ok(renderer.includes('case "focusCount": icon = "check-circle-outline"'));
     assert.ok(renderer.includes('drawMdiGlyph(11, 141, heartColor, "heart", 14, 14)'));
     assert.ok(renderer.includes('drawMdiGlyph(cx, cy, color, icon, 16, 16)'));
