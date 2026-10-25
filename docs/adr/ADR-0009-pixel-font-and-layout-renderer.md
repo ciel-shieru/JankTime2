@@ -1,34 +1,30 @@
-# ADR-0009: Use a licensed pixel font and Poco for the fixed screen composition
+# ADR-0009: Use Raster Gothic system fonts and Poco for the fixed screen composition
 
 - Status: Accepted
-- Date: 2026-10-25
+- Date: 2026-10-26
 
 ## Context
 
-The approved emery reference uses condensed, bitmap-like lettering that must fit dense rows and a large central clock. The Pebble system-font set has limited sizes and wider glyphs than the target text rows. The Alloy skill recommends using a custom TrueType resource, generated bitmap-font resources, and Poco for exact pixel placement.
+The watchface must use the Pebble firmware Raster Gothic system font, rather than bundling a custom font. RePebble documents the Alloy/Poco family names and supported firmware sizes. System fonts remove custom font resources and use the device's native glyph metrics.
 
 ## Options considered
 
-1. Use Pebble system fonts only. This is simpler and has no extra font payload, but the fixed rows are likely to overflow or require breaking the approved font proportions.
-2. Bundle a custom font and load the generated font and alpha bitmap using the documented Moddable parseBMF / parseRLE path. This adds a small licensed asset but allows explicit font sizes and predictable line fitting.
-3. Render the entire face from a precomputed bitmap. This produces a fixed appearance but makes current time, stale indicators, live metric swaps, and dynamic graph values difficult or impossible to render.
+1. Use built-in Raster Gothic system fonts at documented sizes. This matches the request, avoids extra font payload, and uses firmware-native glyph metrics.
+2. Bundle a custom font. This adds resource size and a separate font-rendering path.
+3. Render the whole face as a bitmap. This prevents dynamic values, status indicators, and graphs from being rendered correctly.
 
 ## Decision
 
-Use the SIL Open Font License 1.1 Jersey 10 font from the Core Devices Alloy watchface tutorial as a bundled asset, with its license included in fonts/. Declare only the required sizes and character ranges in src/embeddedjs/manifest.json, and load the generated resources with parseBMF and parseRLE. Use Poco for all drawing and calculate text clipping by measured width, truncating at the final visible character without an ellipsis.
-
-The preview layout uses the provided example content only to exercise alignment. Live integrations must replace fixture values with validated source snapshots; a static preview value must never be treated as genuine provider data.
+Use Poco system fonts with `Gothic-Regular` and `Gothic-Bold`. Use only documented firmware sizes (9, 14, 18, 24, 28, and 36 where available). Dense rows use 9, status and metric values use 14, and the central clock uses 28. All text placement uses baseline-based coordinates derived from each font's reported height. Keep clipping based on measured width without ellipses. Remove custom font assets and parseBMF/parseRLE usage.
 
 ## Consequences
 
-- The font is included with its OFL notice and is not modified.
-- New glyphs require adding the appropriate Unicode block to the manifest.
-- Font-size changes require screenshot review because text widths affect both rows and status-bar fit.
-- The clock, status bar, metrics, graph, focus lines, and calendar lines remain dynamic drawing primitives rather than a flattened image.
+- No custom font files or font license payload are bundled.
+- Glyph coverage is defined by the firmware system font; do not assume custom Unicode glyphs are available.
+- Font family/size changes require screenshot review because glyph widths affect row fit and status-bar layout.
+- The clock, status bar, metrics, graph, focus lines, and calendar lines remain dynamic drawing primitives.
 
 ## References
 
-- https://github.com/coredevices/alloy-watchface-tutorial
-- https://github.com/google/fonts/tree/main/ofl/jersey10
-- https://developer.repebble.com/guides/alloy/
-- https://github.com/coredevices/pebble-watchface-agent-skill
+- https://developer.repebble.com/guides/app-resources/system-fonts/
+- https://developer.repebble.com/guides/alloy/reference/
