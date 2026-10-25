@@ -87,6 +87,25 @@ for (const [index, line] of pythonLock.split(/\r?\n/).entries()) {
     "requirements/pebble-tool.lock:" + (index + 1) + " must have an exact version and at least one SHA-256 hash.");
 }
 
+const aptLockPath = "tooling/ubuntu-24.04-emulator-deps.json";
+let aptLock = {};
+try { aptLock = JSON.parse(read(aptLockPath)); } catch {}
+check(aptLock.schemaVersion === 1 && aptLock.distribution === "ubuntu-24.04" &&
+  aptLock.suite === "noble" && aptLock.architecture === "amd64" &&
+  /^\d{8}T\d{6}Z$/.test(String(aptLock.snapshot || "")),
+  aptLockPath + " must pin a fixed Ubuntu 24.04 amd64 archive snapshot.");
+check(aptLock.packages && typeof aptLock.packages === "object" &&
+  Object.keys(aptLock.packages).length >= 6 &&
+  Object.entries(aptLock.packages).every(([name, version]) =>
+    /^[a-z0-9][a-z0-9+.-]*$/.test(name) && typeof version === "string" && version.length > 0 && !/\s/.test(version)),
+  aptLockPath + " must pin exact versions for all direct emulator runtime packages.");
+const aptInstaller = read("scripts/install-emulator-deps.py");
+check(aptInstaller.includes("apt-get") && aptInstaller.includes("--snapshot") &&
+  aptInstaller.includes("--reinstall") && aptInstaller.includes("dpkg-query") &&
+  aptInstaller.includes("SHA-256") && aptInstaller.includes("Release/Packages"),
+  "Emulator runtime install must use the locked snapshot, reinstall pinned package versions, and document APT digest verification.");
+check(ci.includes("python3 scripts/install-emulator-deps.py"),
+  "CI must use the checked-in, snapshot-pinned emulator dependency installer.");
 const gradleProperties = read("companion/android/gradle/wrapper/gradle-wrapper.properties");
 check(/distributionUrl=https\\:\/\/services\.gradle\.org\/distributions\/gradle-[0-9]+\.[0-9]+\.[0-9]+-bin\.zip/.test(gradleProperties),
   "Gradle distribution URL must include an exact distribution version.");
