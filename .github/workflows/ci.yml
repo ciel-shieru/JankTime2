@@ -64,10 +64,10 @@ jobs:
           set -euo pipefail
           "$HOME/.local/bin/pebble" sdk install 4.33.1
           "$HOME/.local/bin/pebble" sdk activate 4.33.1
-          sdk_root="$(find "$HOME/.pebble-sdk" -type d -name '4.33.1' -print -quit)"
+          sdk_root="$(find "$HOME" -type d -name '4.33.1' -print -quit)"
           if [ -z "$sdk_root" ]; then
             echo "Could not locate installed Pebble SDK 4.33.1" >&2
-            find "$HOME/.pebble-sdk" -maxdepth 5 -type d -print >&2 || true
+            find "$HOME" -maxdepth 7 -type d -iname '*pebble*' -print >&2 || true
             exit 1
           fi
           python scripts/pebble-sdk-manifest.py --root "$sdk_root" \
