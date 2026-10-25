@@ -70,23 +70,58 @@ function labelDate(date: Date): string {
     return days[date.getDay()] + " " + months[date.getMonth()] + " " + date.getDate();
 }
 // Compact, one-pixel MDI Light-style raster icons for the 200×228 display.
+// Pixel rasters generated from the MDI Light SVG paths at 10px height.
+// Material Design Light is published by Pictogrammers under OFL-1.1.
+// Sources: https://github.com/Templarian/MaterialDesignLight-SVG/blob/master/svg/alarm.svg
+//          https://github.com/Templarian/MaterialDesignLight-SVG/blob/master/svg/bluetooth.svg
+const mdiLightAlarm = [
+    ".##....##.",
+    "##########",
+    ".##....##.",
+    ".#..##..#.",
+    "#...##...#",
+    "#....#...#",
+    "#.....#..#",
+    ".#......#.",
+    ".##....##.",
+    "..######..",
+] as const;
+const mdiLightBluetooth = [
+    "...#..",
+    "...##.",
+    "#....#",
+    ".####.",
+    "..##..",
+    "..##..",
+    ".####.",
+    "#....#",
+    "...##.",
+    "...#..",
+] as const;
+
+function drawMdiLightGlyph(cx: number, cy: number, color: unknown, rows: readonly string[]): void {
+    const width = rows[0]?.length ?? 0;
+    const left = cx - Math.floor(width / 2);
+    const top = cy - Math.floor(rows.length / 2);
+    for (let y = 0; y < rows.length; y++) {
+        const row = rows[y] ?? "";
+        let x = 0;
+        while (x < width) {
+            if (row[x] !== "#") {
+                x++;
+                continue;
+            }
+            const start = x;
+            while (x < width && row[x] === "#") x++;
+            render.fillRectangle(color, left + start, top + y, x - start, 1);
+        }
+    }
+}
 function drawAlarm(cx: number, cy: number, color: unknown): void {
-    // MDI Light alarm outline, reduced to a 10px-tall glyph in the status bar.
-    ring(cx, cy, 3, color, 1);
-    line(cx, cy, cx, cy - 2, color);
-    line(cx, cy, cx + 2, cy + 1, color);
-    line(cx - 2, cy - 3, cx - 4, cy - 5, color);
-    line(cx + 2, cy - 3, cx + 4, cy - 5, color);
-    line(cx - 2, cy + 3, cx - 3, cy + 5, color);
-    line(cx + 2, cy + 3, cx + 3, cy + 5, color);
+    drawMdiLightGlyph(cx, cy, color, mdiLightAlarm);
 }
 function drawBluetooth(cx: number, cy: number, color: unknown): void {
-    // Scaled MDI Light bluetooth glyph; single-pixel strokes keep it visually light.
-    line(cx, cy - 5, cx, cy + 5, color);
-    line(cx, cy - 5, cx + 4, cy - 1, color);
-    line(cx + 4, cy - 1, cx - 3, cy + 3, color);
-    line(cx - 3, cy - 3, cx + 4, cy + 2, color);
-    line(cx + 4, cy + 2, cx, cy + 5, color);
+    drawMdiLightGlyph(cx, cy, color, mdiLightBluetooth);
 }
 function drawBattery(x: number, y: number, width: number, percent: number | null, color: unknown): void {
     render.frameRoundRect(x, y, width - 3, 12, color, 1);
