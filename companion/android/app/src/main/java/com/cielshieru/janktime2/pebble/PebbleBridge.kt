@@ -125,7 +125,7 @@ class PebbleBridge(context: Context) : AutoCloseable {
         } catch (failure: IllegalArgumentException) {
             // PebbleKit Android 2 may try to unbind a connection after bindService failed
             // or after the underlying service already unbound it. Ignore only this cleanup error.
-            if (failure.message != "Service not registered") throw failure
+            if (failure.message?.startsWith("Service not registered:") != true) throw failure
         }
     }
 
