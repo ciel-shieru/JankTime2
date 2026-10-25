@@ -36,6 +36,8 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(bridge, /heartSamples/);
     const pkg = JSON.parse(read("../package.json"));
     assert.deepEqual(pkg.pebble.messageKeys, ["TYPE", "ID", "VALUE", "FLAGS", "EXTRA"]);
+    assert.match(bridge, /input: 124/);
+    assert.match(bridge, /output: 124/);
     assert.match(model, /function selectAlarmOrBedtime/);
     assert.match(model, /function clipByWidth/);
     const workflow = read("../.github/workflows/ci.yml");

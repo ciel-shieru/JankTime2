@@ -190,6 +190,10 @@ function handleMessage(message: IncomingMessage): void {
 }
 
 const message = new Message({
+    // AppMessage dictionaries are capped at 124 bytes. The API defaults to
+    // 8 KiB buffers in each direction; this protocol never needs those buffers.
+    input: 124,
+    output: 124,
     keys: ["TYPE", "ID", "VALUE", "FLAGS", "EXTRA"],
     onReadable() {
         try {

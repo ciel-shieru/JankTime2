@@ -24,7 +24,7 @@ CI captures the emery screenshot and runs scripts/check_screenshot.py. The check
 ## Consequences
 
 - Editing the normal mdbl.c template is justified for this documented runtime-memory requirement; do not make unrelated boot-code changes.
-- Every added font size, Unicode block, module, large string, or graph buffer must be considered in runtime-memory review. The HealthService cache is schema-checked and compact; do not grow it with verbose parsing helpers or duplicate values.
+- Every added font size, Unicode block, module, large string, or graph buffer must be considered in runtime-memory review. The HealthService cache is schema-checked and compact; do not grow it with verbose parsing helpers or duplicate values. AppMessage's default 8 KiB inbox and outbox buffers are oversized for this one-dictionary 124-byte protocol; explicitly set Alloy `Message` input/output limits to 124 bytes to avoid wasting roughly 16 KiB of app heap.
 - A green CI run requires both package build success and a screenshot that passes the fatal-screen smoke check.
 - The first successful screenshot must still be inspected for visual fidelity, alignment, clipping, colors, and e-paper behavior.
 
