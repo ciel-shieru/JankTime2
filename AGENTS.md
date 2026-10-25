@@ -17,9 +17,18 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 - Target emery only. Alloy does not target older Pebble platforms.
 - Watch-side source of truth is TypeScript in src/ts/watch/; compiled JavaScript in src/embeddedjs/ is generated and must not be committed.
 - The rendering approach is Alloy/Poco for pixel-level layout. Keep drawing on minute changes or explicit data updates; do not poll/redraw every second.
-- A native Android companion is the planned phone-side bridge. Do not add src/pkjs/index.js: PebbleKit JS and PebbleKit Android are mutually exclusive for a watch project. All provider traffic, Android Calendar Provider access, phone battery readings, and Wakey integration must go through the native companion boundary documented in ADR-0003.
+- A native Android companion is required for Android-only data that PebbleKit JS cannot obtain: selected Android Calendar Provider events, phone battery readings, and the explicit Wakey-SITizen export. Do not add src/pkjs/index.js: PebbleKit JS and PebbleKit Android are mutually exclusive phone-side bridges for one watch project. All provider traffic and Android-only integration must go through the native companion boundary documented by the ADRs.
+- The Pebble mobile app's calendar-to-Timeline sync is not a replacement for Calendar Provider access: the documented Timeline APIs do not expose a query API for reading the app's already-synced calendar pins into the running watchface.
 - The app sends only display-ready, bounded data to the watch. Never send endpoint credentials, bearer tokens, certificates, or full unfiltered provider responses over AppMessage.
 - The watchface must remain useful offline. Keep the last successful snapshot, show stale data when refresh fails, and turn affected metric icons red while stale.
+
+## Android companion implementation rules
+
+- Android application source code must be written in **Kotlin only**.
+- All application UI must use **Jetpack Compose with Material 3 only**. Do not introduce Java application code, XML layout UIs, Android View-based screens, Flutter, React Native, or any other language/UI framework. AndroidManifest.xml, Gradle configuration, and platform metadata/resources required by Android tooling are allowed; they must not be used to implement a second UI framework.
+- Prefer Android platform APIs and AndroidX/Jetpack libraries. Minimize external dependencies. Before adding any non-AndroidX third-party library, document its purpose in companion/README.md and explain why an equivalent handwritten implementation would be complex, security-sensitive, or materially harder to maintain. A direct dependency is not justified merely by convenience.
+- Existing libraries require explicit justification and must be periodically reassessed: PebbleKit Android 2 is the supported bridge to Pebble; OkHttp is retained only for security-sensitive HTTPS handling (timeouts, bounded responses, TLS, and redirect control); WorkManager supports reliable constrained periodic work; Kotlin coroutines support structured cancellation; JUnit is test-only. Keep UI dependencies on official AndroidX Compose and Material 3 libraries.
+- Do not introduce generated Kotlin or UI source that is checked in unless it is a deliberate, reviewed source artifact. Keep screens in Compose and use Material 3 components/tokens consistently.
 
 ## Visual invariants
 
@@ -43,11 +52,25 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 - Do not fetch faster than the configured interval; default intervals are specified in the ADRs.
 - Use bounded payloads and defensive JSON parsing. Never evaluate provider data as code.
 
+## Dependency integrity
+
+- Every direct and transitive code/build dependency must be pinned to an exact version and an integrity digest wherever its package ecosystem supports it. No version ranges, floating tags, latest labels, unpinned Git refs, or unlocked transitive resolution.
+- Keep npm dependencies in package-lock.json with registry integrity fields and use npm ci.
+- Keep Python tooling in a requirements lock with exact versions and SHA-256 hashes for every resolved package.
+- Enable Gradle dependency locking and commit the resulting gradle.lockfile files. Commit companion/android/gradle/verification-metadata.xml with SHA-256 checksums for downloaded Maven/plugin artifacts and metadata. Builds must fail closed on missing/mismatched verification entries.
+- Pin the Gradle distribution by exact version and distributionSha256Sum; verify the checked-in Gradle wrapper JAR when it changes.
+- Pin Pebble tool and SDK versions; verify installed SDK inputs against the reviewed SHA-256 manifest in tooling/.
+- Pin GitHub Actions by full commit SHA. Use exact patch/build versions for Node.js, Python, and the JDK. Where official installers provide and verify archive checksums, retain that verification; do not replace it with a mutable download URL alone.
+- Document any package manager/hosted-runner inputs that cannot be fully locked in docs/security/dependency-pinning.md. Do not describe system repository trust as equivalent to a committed per-package digest.
+- Dependency version or digest changes must be reviewed together. Never regenerate integrity metadata automatically during normal CI; use a deliberate maintenance process and review generated changes before committing them.
+
 ## Workflow and commits
 
 - Follow Conventional Commits for all Git commits.
 - Update an ADR when a material architecture decision changes.
 - Run TypeScript type-check, lint, unit tests, pebble build, and the emery emulator screenshot check before considering watchface code complete.
+- Run Android unit tests, lint, and assembleDebug for companion changes.
+- CI must upload a **production-mode** .pbw artifact built before enabling preview fixtures. Do not distribute the fixture-enabled screenshot build. Keep the .pbw separate from screenshot/log artifacts.
 - CI screenshot artifacts are build evidence. Inspect them for clipping, overlap, missing resources, incorrect fonts, and layout drift.
 - The current renderer is a preview of the approved layout and uses fixture values until the providers/companion are implemented. Do not treat fixture data as live data or treat one passing screenshot smoke check as final visual acceptance.
 - The normal Alloy mdbl.c template may be changed only for documented runtime heap requirements; record heap sizing in an ADR and keep the total allocation within the emery app-RAM budget.
