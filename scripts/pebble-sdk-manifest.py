@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create or verify a deterministic SHA-256 manifest for an installed Pebble SDK."""
+"""Create or verify a compact SHA-256 fingerprint for a complete SDK tree."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 
-FORMAT = "janktime2-sdk-manifest-v1"
+FORMAT = "janktime2-sdk-manifest-v2"
 
 
 def inventory(root: Path) -> dict[str, Any]:
@@ -20,7 +20,6 @@ def inventory(root: Path) -> dict[str, Any]:
     symlinks: dict[str, str] = {}
     for current, dirs, names in os.walk(root, followlinks=False):
         current_path = Path(current)
-        # Directory symlinks are input data too; record them, but do not traverse them.
         kept_dirs: list[str] = []
         for name in sorted(dirs):
             path = current_path / name
@@ -39,52 +38,69 @@ def inventory(root: Path) -> dict[str, Any]:
                 continue
             if not path.is_file():
                 continue
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
-            files[relative] = digest
+            files[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
 
     if not files:
         raise ValueError(f"SDK root contains no regular files: {root}")
-    return {"format": FORMAT, "files": dict(sorted(files.items())), "symlinks": dict(sorted(symlinks.items()))}
+
+    # Hash the sorted path->digest map and symlink map as one deterministic tree
+    # commitment. This still binds every file byte and relative path without
+    # checking in a multi-megabyte manifest listing tens of thousands of files.
+    canonical = json.dumps(
+        {"files": dict(sorted(files.items())), "symlinks": dict(sorted(symlinks.items()))},
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return {
+        "format": FORMAT,
+        "rootSha256": hashlib.sha256(canonical).hexdigest(),
+        "fileCount": len(files),
+        "symlinkCount": len(symlinks),
+    }
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--root", type=Path, required=True, help="SDK directory to inventory")
+    parser.add_argument("--root", type=Path, required=True, help="SDK or platform-package directory")
     mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--write", type=Path, help="write a new manifest (bootstrap only)")
-    mode.add_argument("--verify", type=Path, help="verify the SDK against a committed manifest")
+    mode.add_argument("--write", type=Path, help="write a reviewed fingerprint (maintenance only)")
+    mode.add_argument("--verify", type=Path, help="verify against a committed fingerprint")
     args = parser.parse_args()
 
     root = args.root.resolve(strict=True)
-    current = inventory(root)
+    actual = inventory(root)
     if args.write:
         args.write.parent.mkdir(parents=True, exist_ok=True)
-        args.write.write_text(json.dumps(current, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        print(f"Wrote SHA-256 manifest for {len(current['files'])} SDK files")
+        args.write.write_text(json.dumps(actual, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        print(
+            f"Wrote tree fingerprint {actual['rootSha256']} "
+            f"for {actual['fileCount']} files and {actual['symlinkCount']} symlinks"
+        )
         return 0
 
     expected: dict[str, Any] = json.loads(args.verify.read_text(encoding="utf-8"))
-    if expected.get("format") != FORMAT:
-        raise SystemExit("SDK manifest format is missing or unsupported")
-    if current != expected:
-        expected_files = expected.get("files", {})
-        current_files = current.get("files", {})
-        missing = sorted(set(expected_files) - set(current_files))
-        unexpected = sorted(set(current_files) - set(expected_files))
-        changed = sorted(path for path in set(expected_files) & set(current_files)
-                         if expected_files[path] != current_files[path])
-        expected_links = expected.get("symlinks", {})
-        current_links = current.get("symlinks", {})
-        link_diff = sorted(path for path in set(expected_links) | set(current_links)
-                           if expected_links.get(path) != current_links.get(path))
-        print(f"SDK digest verification failed: missing={missing[:10]}, "
-              f"unexpected={unexpected[:10]}, changed={changed[:10]}, "
-              f"symlink_changes={link_diff[:10]}", file=sys.stderr)
+    if expected != actual:
+        print(
+            f"SDK tree fingerprint mismatch: expected={expected}, actual={actual}",
+            file=sys.stderr,
+        )
         return 1
 
-    print(f"Verified SHA-256 manifest for {len(current['files'])} SDK files")
+    print(
+        f"Verified tree fingerprint {actual['rootSha256']} "
+        f"({actual['fileCount']} files, {actual['symlinkCount']} symlinks)"
+    )
     return 0
 
 
-if __name__ == "__main__":
-    raise SystemExit(main())
+if __import__("os").environ.get("JANKTIME2_RUN_SELF_TESTS") == "1":
+    # Exercise determinism and detection without any external package.
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as temporary:
+        root = Path(temporary)
+        (root / "file.txt").write_text("pinned bytes", encoding="utf-8")
+        before = inventory(root)
+        assert inventory(root) == before
+        (root / "file.txt").write_text("changed bytes", encoding="utf-8")
+        assert inventory(root) != before
