@@ -61,12 +61,12 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 - Pin the Gradle distribution by exact version and distributionSha256Sum; verify the checked-in Gradle wrapper JAR when it changes.
 - Pin Pebble tool and SDK versions; verify installed SDK inputs against the reviewed SHA-256 manifest in tooling/.
 - Pin GitHub Actions by full commit SHA. Use exact patch/build versions for Node.js, Python, and the JDK. Where official installers provide and verify archive checksums, retain that verification; do not replace it with a mutable download URL alone.
-- Document any package manager/hosted-runner inputs that cannot be fully locked in docs/security/dependency-pinning.md. Do not describe system repository trust as equivalent to a committed per-package digest.
+- Pin Linux emulator runtime dependencies to a fixed Ubuntu snapshot and exact package versions; rely on APT's integrity verification against authenticated package metadata. Document the remaining provider-managed hosted-runner VM boundary in docs/security/dependency-pinning.md. Do not describe the runner VM itself as pinned.
 - Dependency version or digest changes must be reviewed together. Never regenerate integrity metadata automatically during normal CI; use a deliberate maintenance process and review generated changes before committing them.
 
 ## Automated policy enforcement
 
-- `scripts/check-repo-policy.mjs` is a required CI gate before watchface or Android builds. It checks immutable GitHub Action refs, exact declared tool/dependency versions, package integrity metadata, SDK/Gradle digest manifests, Android Kotlin-only source, Compose + Material 3-only UI, and the external-library justification register.
+- `scripts/check-repo-policy.mjs` is a required CI gate before watchface or Android builds. It checks immutable GitHub Action refs, exact declared tool/dependency versions, npm/Python package integrity, fixed Ubuntu snapshot and exact emulator package versions, SDK/Gradle digest manifests, Android Kotlin-only source, Compose + Material 3-only UI, and the external-library justification register.
 - Update the checker when adding a supported dependency ecosystem, toolchain, SDK package, or required Android capability. A passing build is not permission to bypass a policy failure; pin changes and policy exceptions require a reviewed source change.
 
 ## Workflow and commits
