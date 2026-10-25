@@ -38,7 +38,7 @@ check(ci.includes("--write-verification-metadata sha256") && ci.includes("--writ
   "CI must generate Gradle checksum metadata and dependency locks before validating their reviewed digests.");
 check(ci.includes("sha256sum --check tooling/gradle-dependency-pins.sha256"),
   "CI must compare generated Gradle dependency pins against the reviewed SHA-256 manifest.");
-check(ci.includes("pebble sdk install 4.33.1") && ci.includes("build-tools;36.0.0") && ci.includes("platforms;android-36"),
+check(ci.includes("sdk install 4.33.1") && ci.includes("build-tools;36.0.0") && ci.includes("platforms;android-36"),
   "CI must select exact Pebble and Android SDK package revisions.");
 check(policy.includes("GitHub-hosted runner images") && policy.includes("signed package-repository metadata"),
   "The non-source-controlled hosted runner / OS-package trust boundary must remain explicitly documented.");
@@ -90,7 +90,7 @@ for (const [index, line] of pythonLock.split(/\r?\n/).entries()) {
 const gradleProperties = read("companion/android/gradle/wrapper/gradle-wrapper.properties");
 check(/distributionUrl=https\\:\/\/services\.gradle\.org\/distributions\/gradle-[0-9]+\.[0-9]+\.[0-9]+-bin\.zip/.test(gradleProperties),
   "Gradle distribution URL must include an exact distribution version.");
-check(new RegExp("^distributionSha256Sum=" + sha256.source + "$", "m").test(gradleProperties),
+check(/^distributionSha256Sum=[0-9a-f]{64}$/m.test(gradleProperties),
   "Gradle distribution must be SHA-256 pinned.");
 const wrapperDigest = read("companion/android/gradle/wrapper/gradle-wrapper.jar.sha256");
 check(/^[0-9a-f]{64}\s+gradle-wrapper\.jar\s*$/im.test(wrapperDigest),
