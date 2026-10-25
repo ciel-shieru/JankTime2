@@ -17,14 +17,14 @@ The watchface must read synced Android calendars, phone battery state, and data 
 
 Choose option 3. The native companion is the single phone-side data bridge and configurator. It owns network access, credential storage, calendar permissions, phone battery data, provider refresh jobs, source cache, image downscaling, and Wakey pairing. The watch-side Alloy app receives only bounded display-ready data through AppMessage. The companion registers against the watchface's UUID.
 
-Do not add src/pkjs/index.js; doing so would select the mutually exclusive PebbleKit JS path. Before a production implementation, verify the selected PebbleKit Android 2 API and current RePebble companion-app compatibility against live documentation. The companion is Android-first because the required Wakey-SITizen integration and Mindwtr app context are Android.
+Do not add src/pkjs/index.js; doing so would select the mutually exclusive PebbleKit JS path. The current implementation uses PebbleKit Android 2 through the pinned `io.rebble.pebblekit2:client` dependency and CI validates its compile-time integration. Before upgrading that bridge, re-check the current RePebble API and companion-app compatibility against live documentation. The companion is Android-first because the required Wakey-SITizen integration and Mindwtr app context are Android.
 
 ## Consequences
 
 - Configuration UX lives in the Android companion, not Clay.
 - The companion's settings and secrets stay on the phone.
 - CI runs Android unit tests, lint, debug APK assembly, Gradle artifact verification, and dependency-lock digest checks for the native companion.
-- The repository's initial CI validates the watchface toolchain only.
+- CI runs a required repository-policy gate, watchface lint/type-check/tests/build/emulator screenshot, and Android unit tests/lint/debug APK assembly.
 - Users must install the companion for calendar, phone battery, remote providers, and Wakey integration. Missing companion data must be clearly marked stale/unavailable, not fabricated.
 
 ## References
