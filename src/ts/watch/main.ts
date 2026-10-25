@@ -29,7 +29,7 @@ function loadFont(size: number): PocoFont {
 const statusFont = loadFont(12);
 const valueFont = loadFont(16);
 const smallFont = loadFont(12);
-const clockFont = loadFont(56);
+const clockFont = loadFont(42);
 
 let lastDate = new Date();
 let watchBatteryPercent = 0;
@@ -196,15 +196,15 @@ function drawMetric(slot: SlotId, cx: number, iconY: number, valueY: number, max
     centered(clipped(value, valueFont, maxWidth), valueFont, black, cx, valueY);
 }
 function drawPlanet(): void {
-    render.frameRoundRect(85, 56, 30, 30, blue, 1);
-    circle(92, 64, 1, blue); circle(109, 62, 1, blue);
-    circle(110, 79, 1, blue); circle(92, 81, 1, blue);
-    circle(100, 71, 7, blue);
-    line(88, 78, 95, 72, blue, 2);
-    line(104, 69, 112, 63, blue, 2);
-    line(90, 69, 98, 74, paper, 2);
-    line(98, 66, 103, 71, paper, 2);
-    line(101, 69, 106, 74, paper, 2);
+    render.frameRoundRect(85, 58, 30, 30, blue, 1);
+    circle(92, 66, 1, blue); circle(109, 64, 1, blue);
+    circle(110, 81, 1, blue); circle(92, 83, 1, blue);
+    circle(100, 73, 7, blue);
+    line(88, 80, 95, 74, blue, 2);
+    line(104, 71, 112, 65, blue, 2);
+    line(90, 71, 98, 76, paper, 2);
+    line(98, 68, 103, 73, paper, 2);
+    line(101, 71, 106, 76, paper, 2);
 }
 function drawHeartRate(): void {
     const samples = displayState.heartSamples ?? heartSamples;
@@ -215,10 +215,10 @@ function drawHeartRate(): void {
         minimum = Math.min(minimum, sample);
         maximum = Math.max(maximum, sample);
     }
-    circle(8, 135, 4, blue); circle(14, 135, 4, blue);
-    line(4, 136, 11, 144, blue, 2); line(18, 136, 11, 144, blue, 2);
-    render.drawText(String(bpm), valueFont, black, 22, 128);
-    const left = 39, right = 159, top = 130, bottom = 143;
+    circle(8, 140, 4, blue); circle(14, 140, 4, blue);
+    line(4, 141, 11, 149, blue, 2); line(18, 141, 11, 149, blue, 2);
+    render.drawText(String(bpm), valueFont, black, 22, 137);
+    const left = 39, right = 159, top = 136, bottom = 147;
     const span = Math.max(1, maximum - minimum);
     let px = left;
     let py = bottom - Math.round(((samples[0] ?? minimum) - minimum) * (bottom - top) / span);
@@ -229,7 +229,7 @@ function drawHeartRate(): void {
         line(px, py, x, y, blue);
         px = x; py = y;
     }
-    centered(String(minimum) + "/" + String(maximum), smallFont, black, 179, 132);
+    centered(String(minimum) + "/" + String(maximum), smallFont, black, 179, 138);
 }
 function drawRows(): void {
     const focus = [
@@ -240,12 +240,12 @@ function drawRows(): void {
         displayState.calendarRows[0] ?? formatCalendarRow("10:00", "Campus", "Systems lab"),
         displayState.calendarRows[1] ?? formatCalendarRow("15:30", "Home", "Model eval run"),
     ];
-    line(5, 147, 195, 147, black);
-    render.drawText(clipped(focus[0] ?? "", smallFont, 190), smallFont, black, 6, 152);
-    render.drawText(clipped(focus[1] ?? "", smallFont, 190), smallFont, black, 6, 166);
-    line(5, 180, 195, 180, black);
-    render.drawText(clipped(events[0] ?? "", smallFont, 190), smallFont, black, 6, 186);
-    render.drawText(clipped(events[1] ?? "", smallFont, 190), smallFont, black, 6, 200);
+    line(5, 153, 195, 153, black);
+    render.drawText(clipped(focus[0] ?? "", smallFont, 190), smallFont, black, 6, 159);
+    render.drawText(clipped(focus[1] ?? "", smallFont, 190), smallFont, black, 6, 174);
+    line(5, 188, 195, 188, black);
+    render.drawText(clipped(events[0] ?? "", smallFont, 190), smallFont, black, 6, 196);
+    render.drawText(clipped(events[1] ?? "", smallFont, 190), smallFont, black, 6, 210);
 }
 function drawStatus(date: Date): void {
     render.drawText(labelDate(date), statusFont, black, 5, 3);
@@ -279,17 +279,17 @@ function draw(event?: AlloyWatchMinuteEvent): void {
         ["grid.top.1", 20], ["grid.top.2", 60], ["grid.top.3", 100],
         ["grid.top.4", 140], ["grid.top.5", 180],
     ] as const;
-    for (const [slot, x] of rowOne) drawMetric(slot, x, 31, 40, 36);
+    for (const [slot, x] of rowOne) drawMetric(slot, x, 34, 44, 36);
 
-    drawMetric("grid.bottom.1", 20, 65, 76, 36);
-    drawMetric("grid.bottom.2", 60, 65, 76, 36);
+    drawMetric("grid.bottom.1", 20, 68, 80, 36);
+    drawMetric("grid.bottom.2", 60, 68, 80, 36);
     drawPlanet();
-    drawMetric("grid.bottom.4", 140, 65, 76, 36);
-    drawMetric("grid.bottom.5", 180, 65, 76, 36);
+    drawMetric("grid.bottom.4", 140, 68, 80, 36);
+    drawMetric("grid.bottom.5", 180, 68, 80, 36);
 
-    centered(formatTime24(lastDate), clockFont, black, 100, 91);
-    drawMetric("clock.left", 20, 101, 113, 36);
-    drawMetric("clock.right", 180, 101, 113, 36);
+    centered(formatTime24(lastDate), clockFont, black, 100, 87);
+    drawMetric("clock.left", 20, 107, 119, 36);
+    drawMetric("clock.right", 180, 107, 119, 36);
     drawHeartRate();
     drawRows();
     render.end();
