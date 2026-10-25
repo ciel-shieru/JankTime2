@@ -58,7 +58,7 @@ class SnapshotRefresher(private val context: Context) {
             snapshot = snapshot.attempted("homeAssistant", now)
             try {
                 val base = config.homeAssistantUrl
-                val hasEntity = listOf(config.sensorEntity, config.waterEntity, config.weatherEntity, config.climateEntity)
+                val hasEntity = listOf(config.sensorEntity, config.genericSensorEntity, config.waterEntity, config.weatherEntity, config.climateEntity)
                     .any { it.isNotBlank() }
                 if (base.isBlank() || !hasEntity) throw IllegalStateException("Home Assistant is not configured.")
                 val token = credentials.get("home_assistant")
@@ -67,6 +67,10 @@ class SnapshotRefresher(private val context: Context) {
                 if (config.sensorEntity.isNotBlank()) {
                     metrics["fanState"] = ha.sensorValue(base, token, config.sensorEntity)
                         ?: throw IllegalStateException("Sensor value is unavailable.")
+                }
+                if (config.genericSensorEntity.isNotBlank()) {
+                    metrics["haSensor"] = ha.sensorValue(base, token, config.genericSensorEntity)
+                        ?: throw IllegalStateException("Generic sensor value is unavailable.")
                 }
                 if (config.waterEntity.isNotBlank()) {
                     metrics["water"] = ha.sensorValue(base, token, config.waterEntity)
@@ -96,7 +100,7 @@ class SnapshotRefresher(private val context: Context) {
                 snapshot = snapshot.succeeded("homeAssistant", now)
             } catch (_: Exception) {
                 unavailableSources += "Home Assistant"
-                snapshot = snapshot.markStale(listOf("fanState", "water", "haClimateValue", "weatherFeelsLike", "rainChance"))
+                snapshot = snapshot.markStale(listOf("fanState", "haSensor", "water", "haClimateValue", "weatherFeelsLike", "rainChance"))
             }
         }
 

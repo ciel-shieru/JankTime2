@@ -223,6 +223,9 @@ private fun CompanionSettingsScreen(
         TextInput("HTTPS base URL", config.homeAssistantUrl, { config = config.copy(homeAssistantUrl = it) })
         SecretInput("Long-lived access token", secrets.homeAssistant, { secrets = secrets.copy(homeAssistant = it) })
         TextInput("Sensor entity (fan state)", config.sensorEntity, { config = config.copy(sensorEntity = it) })
+        TextInput("Generic Home Assistant sensor entity (optional)", config.genericSensorEntity, {
+            config = config.copy(genericSensorEntity = it)
+        })
         TextInput("Water sensor entity", config.waterEntity, { config = config.copy(waterEntity = it) })
         TextInput("Weather entity", config.weatherEntity, { config = config.copy(weatherEntity = it) })
         TextInput("Climate entity", config.climateEntity, { config = config.copy(climateEntity = it) })

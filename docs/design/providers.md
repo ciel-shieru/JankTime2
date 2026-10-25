@@ -8,7 +8,7 @@ This is intentional: RePebble explicitly says PebbleKit JS cannot be used togeth
 
 ## Home Assistant details
 
-Use authenticated HTTPS calls directly to the configured Home Assistant server. Sensor entities expose their current state/attributes; climate metrics must choose an explicitly configured state or allowed attribute. Weather entity integrations have varying attributes, so use a supplied apparent/feels-like temperature when available and Home Assistant's supported forecast endpoint/action for precipitation probability. Do not assume every weather entity exposes a feels-like attribute or current rain probability. If unavailable, emit an unavailable state or an explicitly configured fallback rather than fabricating data. Condition values map through a fixed local icon table; provider data cannot select arbitrary resources.
+Use authenticated HTTPS calls directly to the configured Home Assistant server. Fan state, a separately selectable generic sensor, water, weather, and climate entities have independent optional entity fields and populate the matching watch metric IDs. Sensor entities expose their current state/attributes; climate metrics must choose an explicitly configured state or allowed attribute. Weather entity integrations have varying attributes, so use a supplied apparent/feels-like temperature when available and Home Assistant's supported forecast endpoint/action for precipitation probability. Do not assume every weather entity exposes a feels-like attribute or current rain probability. If unavailable, emit an unavailable state or an explicitly configured fallback rather than fabricating data. Condition values map through a fixed local icon table; provider data cannot select arbitrary resources.
 
 ## Prometheus details
 

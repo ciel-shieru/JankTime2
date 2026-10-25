@@ -7,6 +7,7 @@ import org.json.JSONArray
 data class CompanionConfig(
     val homeAssistantUrl: String = "",
     val sensorEntity: String = "",
+    val genericSensorEntity: String = "",
     val waterEntity: String = "",
     val weatherEntity: String = "",
     val climateEntity: String = "",
@@ -69,6 +70,7 @@ object ConfigStore {
         return CompanionConfig(
             homeAssistantUrl = prefs.getString("ha.url", "").orEmpty(),
             sensorEntity = prefs.getString("ha.sensor_entity", "").orEmpty(),
+            genericSensorEntity = prefs.getString("ha.generic_sensor_entity", "").orEmpty(),
             waterEntity = prefs.getString("ha.water_entity", "").orEmpty(),
             weatherEntity = prefs.getString("ha.weather_entity", "").orEmpty(),
             climateEntity = prefs.getString("ha.climate_entity", "").orEmpty(),
@@ -103,6 +105,7 @@ object ConfigStore {
         val editor = preferences(context).edit()
             .putString("ha.url", checked.homeAssistantUrl.trim())
             .putString("ha.sensor_entity", checked.sensorEntity.trim())
+            .putString("ha.generic_sensor_entity", checked.genericSensorEntity.trim())
             .putString("ha.water_entity", checked.waterEntity.trim())
             .putString("ha.weather_entity", checked.weatherEntity.trim())
             .putString("ha.climate_entity", checked.climateEntity.trim())

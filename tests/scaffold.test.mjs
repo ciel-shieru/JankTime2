@@ -60,6 +60,14 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(renderer, /MaterialDesignLight-SVG/);
     assert.match(renderer, /fillRectangle\(color, left \+ start, top \+ y, x - start, 1\)/);
     assert.match(renderer, /centered\(safe === null \? "--" : String\(safe\)/);
+    const refreshSource = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/data/RefreshIntervals.kt");
+    assert.match(refreshSource, /config\.genericSensorEntity/);
+    assert.match(refreshSource, /metrics\["haSensor"\]/);
+    const companionScreen = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/MainActivity.kt");
+    assert.match(companionScreen, /Generic Home Assistant sensor entity/);
+    const companionBridge = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/pebble/PebbleBridge.kt");
+    assert.match(companionBridge, /senderDelegate = lazy/);
+    assert.match(companionBridge, /Service not registered/);
     assert.doesNotMatch(renderer, /String\(safe\) \+ "%"/);
     assert.match(renderer, /const bluetoothConnected = watch\.connected\.app/);
     assert.match(renderer, /baselineY - font\.height/);

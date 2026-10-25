@@ -16,7 +16,7 @@ Home Assistant is the sole weather provider and must also supply selectable sens
 
 ## Decision
 
-Choose option 3. The companion calls the configured Home Assistant API over HTTPS using a user-provided, least-privilege token. The user selects entity IDs for each HA-backed metric and selects the exact state/attribute for a climate value. No token, Authorization header, or raw entity response is sent through AppMessage or logged.
+Choose option 3. The companion calls the configured Home Assistant API over HTTPS using a user-provided, least-privilege token. Each HA-backed metric has its own entity ID, including a generic sensor metric, and the user selects the exact state/attribute for a climate value. No token, Authorization header, or raw entity response is sent through AppMessage or logged.
 
 The provider contract must account for integration-specific attributes:
 - map known Home Assistant weather condition strings through a fixed local icon table;
