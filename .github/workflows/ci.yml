@@ -53,11 +53,8 @@ jobs:
           python-version: "3.12.15"
           check-latest: false
 
-      - name: Install emulator runtime
-        run: |
-          sudo apt-get update
-          sudo apt-get install --yes --no-install-recommends \
-            libsdl2-2.0-0 libglib2.0-0 libpixman-1-0 zlib1g libsndio7.0 xvfb
+      - name: Install SHA-256-verified emulator runtime from pinned Ubuntu snapshot
+        run: python3 scripts/install-emulator-deps.py
 
       - name: Install SHA-256-pinned Pebble tool
         env:
