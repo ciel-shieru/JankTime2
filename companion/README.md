@@ -40,3 +40,10 @@ Any new library requires a row here before it is introduced, including the preci
 The watch receives display values, selected icon identifiers, timestamps, freshness flags, at most two focus items, at most two calendar events, a bounded heart-rate sample set, and an optional already-downscaled image. It must never receive provider URLs containing credentials, bearer tokens, private certificates, or raw task/calendar records beyond the displayed fields.
 
 All native APIs and inter-app contracts must be checked against current Android and RePebble documentation before implementation. Follow the Wakey export contract in docs/integrations/wakey-sitizen.md. Use the fixed-key AppMessage protocol described in docs/integrations/appmessage-protocol.md; named keys map to numeric PebbleKit Android 2 dictionary IDs in package.json array order.
+
+
+## Pebble mobile-app compatibility
+
+The companion uses PebbleKit Android 2's bound-service API, with auto-selection disabled and an explicit user-selected eligible phone app. Gravel (`com.anopticlabs.gravel`) is an intended candidate: it is surfaced only if its installed build advertises the compatible PebbleKit Android 2 service and appears in the library's eligible-app picker. Package visibility is declared explicitly for Gravel. Do not bypass the picker or trust an app solely because its package name matches.
+
+Gadgetbridge can connect to and manage Pebble watches, but its current external Pebble interface is not a PebbleKit Android 2 bound-service endpoint for sending arbitrary AppMessage dictionaries to a running watchface. The upstream Gadgetbridge Pebble receiver handles a narrow notification broadcast (`PEBBLE_ALERT`), not generic watchface AppMessage transport. JankTime2 therefore does not claim Gadgetbridge transport compatibility yet; implementing it requires a reviewed, supported Gadgetbridge-side AppMessage bridge or an upstream API, plus transport-specific tests. Do not silently send the current PebbleKit2 API to Gadgetbridge or fall back to unprotected implicit broadcasts for private display data.
