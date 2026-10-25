@@ -11,37 +11,7 @@
             "./health"
         ]
     },
-    "resources": {
-        "*-alpha": [
-            {
-                "source": "./assets/Jersey10-Regular",
-                "size": 12,
-                "monochrome": true,
-                "blocks": [
-                    "Basic Latin",
-                    "Latin-1 Supplement"
-                ]
-            },
-            {
-                "source": "./assets/Jersey10-Regular",
-                "size": 16,
-                "monochrome": true,
-                "blocks": [
-                    "Basic Latin",
-                    "Latin-1 Supplement"
-                ]
-            },
-            {
-                "source": "./assets/Jersey10-Regular",
-                "size": 42,
-                "monochrome": true,
-                "blocks": [
-                    "Basic Latin",
-                    "Latin-1 Supplement"
-                ]
-            }
-        ]
-    },
+    "resources": {},
     "ffi": {
         "sources": [
             "../c/health_ffi.c"
