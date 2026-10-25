@@ -225,7 +225,7 @@ check(/^\s*import\s+androidx\.compose\.material3\./m.test(kotlinSource),
 check(/@Composable\b/.test(kotlinSource), "Android UI must be implemented with Jetpack Compose.");
 
 const companionBuildReadme = read("companion/android/README.md");
-check(/Android SDK 36\b/.test(companionBuildReadme),
+check(/Android SDK platform 36\b/.test(companionBuildReadme),
   "companion/android/README.md must document the same pinned Android SDK level used by CI and Gradle (36).");
 
 if (failures.length > 0) {
