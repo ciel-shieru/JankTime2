@@ -17,7 +17,7 @@ class SnapshotAndTaskTest {
         assertTrue(message.contains("Home Assistant (HTTPS URL, token"))
         assertTrue(message.contains("Prometheus (HTTPS URL, token"))
         assertTrue(message.contains("Watch updated where data is available"))
-        assertTrue(!message.contains("token") && !message.contains("https://"))
+        assertTrue(!message.contains("https://") && !message.contains("example-secret"))
     }
 
     @Test
