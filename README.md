@@ -94,10 +94,9 @@ PebbleKit JS cannot directly read another Android application's private DataStor
 
 ### Mindwtr
 
-Use the self-hosted Mindwtr Cloud REST API over HTTPS with a read-only bearer token, not direct access to the Android app's private files. The configured server URL is the user's instance. Request today's focus items and derive:
-- the next two focus items, in start/due-time order;
-- remaining focus items for today;
-- total items that were assigned today's focus, including completed items that remain in the API's history response.
+Use the self-hosted Mindwtr Cloud API over HTTPS with a read-only bearer token; never access the Android app's private files. The current Cloud API supports GET /v1/tasks?isFocusedToday=true&all=1&limit=...&offset=... and returns a {tasks, total, limit, offset} page. Validate and paginate results rather than assuming one page is complete. Task objects expose status, priority, start time, due date, the focus flag, and completion timestamps.
+
+For a focus total across tasks completed between polls, use a date-scoped local ledger of task IDs previously observed in today's focus list. The remaining count comes from current unfinished focus tasks; the total is the union of IDs observed focused today and currently focused tasks. Since Mindwtr clears isFocusedToday at completion, this history is best-effort if the companion was offline or a task was completed before the next poll. Do not infer focus membership for arbitrary completed tasks or fabricate a missing count. Future Mindwtr focus-history support can remove this limitation.
 
 Show the remaining/total pair in the circle-check metric (for example, 4 / 7). Refresh defaults to 5 minutes and is configurable from 1 to 60 minutes.
 

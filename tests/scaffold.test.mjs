@@ -40,6 +40,13 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(model, /function clipByWidth/);
     const workflow = read("../.github/workflows/ci.yml");
     assert.match(workflow, /check_screenshot\.py/);
+    const manifest = JSON.parse(read("../src/embeddedjs/manifest.json"));
+    const fontSizes = manifest.resources["*-alpha"].map((resource) => resource.size);
+    assert.deepEqual(fontSizes, [12, 16, 42]);
+    const renderer = read("../src/ts/watch/main.ts");
+    for (const size of fontSizes) {
+        assert.ok(renderer.includes("loadFont(" + size + ")"), "Missing renderer font size " + size);
+    }
     const boot = read("../src/c/mdbl.c");
     assert.match(boot, /ModdableCreationRecord/);
     assert.match(boot, /\.slot = 31744/);
@@ -63,6 +70,7 @@ test("all accepted architecture decisions are present", () => {
         "../docs/adr/ADR-0013-prometheus-alertmanager-provider.md",
         "../docs/adr/ADR-0014-android-calendar-provider.md",
         "../docs/adr/ADR-0015-image-and-epaper-rendering.md",
+        "../docs/adr/ADR-0016-font-resource-and-blank-screen-regression.md",
     ]) {
         assert.ok(existsSync(new URL(path, import.meta.url)), "Missing ADR: " + path);
     }

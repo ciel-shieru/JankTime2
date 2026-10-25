@@ -13,18 +13,11 @@
         "*-alpha": [
             {
                 "source": "./assets/Jersey10-Regular",
-                "size": 10,
-                "monochrome": true,
-                "blocks": [
-                    "Basic Latin"
-                ]
-            },
-            {
-                "source": "./assets/Jersey10-Regular",
                 "size": 12,
                 "monochrome": true,
                 "blocks": [
-                    "Basic Latin"
+                    "Basic Latin",
+                    "Latin-1 Supplement"
                 ]
             },
             {
@@ -38,7 +31,7 @@
             },
             {
                 "source": "./assets/Jersey10-Regular",
-                "size": 56,
+                "size": 42,
                 "monochrome": true,
                 "blocks": [
                     "Basic Latin",

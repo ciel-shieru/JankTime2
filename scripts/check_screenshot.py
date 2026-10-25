@@ -141,6 +141,25 @@ def main() -> int:
         )
         return 1
 
+    # A blank white screenshot can mean that the Alloy VM exited at launch,
+    # e.g. because a requested custom-font resource is missing. Require the
+    # foreground and accents expected in this watchface, not just a non-gray image.
+    dark_pixels = sum(1 for r, g, b in pixels if max(r, g, b) < 160)
+    blue_pixels = sum(1 for r, g, b in pixels if b >= 100 and b >= r + 60 and b >= g + 20)
+    yellow_pixels = sum(1 for r, g, b in pixels if r >= 160 and g >= 110 and r >= g + 25 and g >= b + 35)
+    accent_pixels = blue_pixels + yellow_pixels
+    print(
+        f"Foreground pixels: {dark_pixels}; blue pixels: {blue_pixels}; "
+        f"yellow pixels: {yellow_pixels}"
+    )
+    if dark_pixels < 40 or accent_pixels < 10:
+        print(
+            "blank-screen smoke check failed: expected foreground text and blue/yellow accents; "
+            "inspect Alloy launch logs and generated font resources",
+            file=sys.stderr,
+        )
+        return 1
+
     print("Emery screenshot smoke check passed.")
     return 0
 
