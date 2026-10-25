@@ -16,7 +16,7 @@ Run an instant query through the Prometheus-compatible `/api/v1/query` API. CPU 
 
 ## Mindwtr details
 
-Use only the user's configured self-hosted Cloud REST API endpoint with a read-only token. Cloud API and Mindwtr's desktop-only Local API are not interchangeable: verify the Cloud task endpoint, available query parameters, and whether returned task data retains today's focus/starred status, start and due times, priority, and completed history. Do not assume desktop-only filters exist on Cloud. If required semantics are unavailable, keep the metric unavailable and create a small explicit upstream export contract rather than reading the Android app's private storage.
+Use only the user's configured self-hosted Cloud REST API endpoint with a read-only token. The Mindwtr Cloud REST API exposes GET /v1/tasks with isFocusedToday filtering and the all=1 option for including completed tasks; the companion pages this endpoint with a read-only token. It retains task start/due/priority fields needed for the watch rows. A local daily ledger of opaque IDs records tasks observed focused today, because completed focus items can disappear from the active focus set between polls. If the companion was offline while a task was focused and completed, that historical total is best-effort rather than fabricated.
 
 ## Snapshot shape
 

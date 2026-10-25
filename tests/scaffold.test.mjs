@@ -55,6 +55,17 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(boot, /ModdableCreationRecord/);
     assert.match(boot, /\.slot = 31744/);
     assert.match(boot, /\.chunk = 19456/);
+    assert.match(boot, /\.fxBuildFFI = fxBuildFFI/);
+    assert.deepEqual(pkg.pebble.capabilities, ["health"]);
+    const ffi = manifest.ffi;
+    assert.deepEqual(ffi.sources, ["../c/health_ffi.c"]);
+    assert.deepEqual(Object.keys(ffi.functions).sort(), [
+        "health_metric", "health_refresh", "health_sample", "health_sample_count",
+    ].sort());
+    assert.match(read("../src/c/health_ffi.c"), /health_service_sum_today\(HealthMetricStepCount\)/);
+    assert.match(read("../src/c/health_ffi.c"), /health_service_get_minute_history/);
+    assert.match(read("../src/ts/watch/health.ts"), /function formatSleepMinutes/);
+
 });
 
 test("all accepted architecture decisions are present", () => {

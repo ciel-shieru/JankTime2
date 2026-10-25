@@ -118,14 +118,14 @@ function handleMessage(message: IncomingMessage): void {
         return;
     }
     if (kind === "image") {
-        const match = /^chunk\.[0-4]$/.exec(id);
+        const match = /^chunk\.[0-9]$/.exec(id);
         const chunkIndex = match === null ? -1 : Number(id.slice(6));
-        const text = asText(value, 190);
+        const text = asText(value, 96);
         if (chunkIndex < 0 || text === null) return;
         const chunkRows = text.split(";");
-        if (chunkRows.length !== 6 || !chunkRows.every((row) => /^[01]{30}$/.test(row))) return;
+        if (chunkRows.length !== 3 || !chunkRows.every((row) => /^[01]{30}$/.test(row))) return;
         const rows = displayState.imageRows?.slice() ?? Array.from({ length: 30 }, () => "");
-        for (let i = 0; i < chunkRows.length; i++) rows[chunkIndex * 6 + i] = chunkRows[i] ?? "";
+        for (let i = 0; i < chunkRows.length; i++) rows[chunkIndex * 3 + i] = chunkRows[i] ?? "";
         displayState.imageRows = rows;
         changed();
         return;
@@ -145,7 +145,13 @@ function handleMessage(message: IncomingMessage): void {
                 break;
             }
             case "alarmTime": {
-                const time = validTime(value);
+                const raw = asText(value, 5);
+                if (raw === "--:--") {
+                    displayState.alarmTime = null;
+                    displayState.alarmIsBedtime = false;
+                    break;
+                }
+                const time = validTime(raw);
                 const bedtime = asFlag(flags);
                 if (time === null || bedtime === null) return;
                 displayState.alarmTime = time;

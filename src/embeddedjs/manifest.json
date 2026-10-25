@@ -7,7 +7,8 @@
             "./main",
             "./model",
             "./bridge",
-            "./config"
+            "./config",
+            "./health"
         ]
     },
     "resources": {
@@ -40,5 +41,32 @@
                 ]
             }
         ]
+    },
+    "ffi": {
+        "sources": [
+            "../c/health_ffi.c"
+        ],
+        "functions": {
+            "health_refresh": {
+                "arguments": [],
+                "returns": "int32_t"
+            },
+            "health_metric": {
+                "arguments": [
+                    "int32_t"
+                ],
+                "returns": "int32_t"
+            },
+            "health_sample_count": {
+                "arguments": [],
+                "returns": "int32_t"
+            },
+            "health_sample": {
+                "arguments": [
+                    "int32_t"
+                ],
+                "returns": "int32_t"
+            }
+        }
     }
 }

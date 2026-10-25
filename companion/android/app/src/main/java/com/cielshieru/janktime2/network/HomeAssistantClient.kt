@@ -12,7 +12,7 @@ data class HomeAssistantState(
 
 data class HomeAssistantWeather(
     val condition: String,
-    val feelsLikeCelsius: Double?,
+    val feelsLikeTemperature: Double?,
     val rainChancePercent: Int?,
 )
 
@@ -33,12 +33,24 @@ class HomeAssistantClient {
     fun fetchWeather(baseUrl: String, token: String, entityId: String): HomeAssistantWeather {
         val current = fetchState(baseUrl, token, entityId)
         val condition = current.state.lowercase().take(40)
-        val apparent = numericAttribute(current.attributes, "apparent_temperature")
-        val rainChance = runCatching { fetchRainChance(baseUrl, token, entityId) }.getOrNull()
-        return HomeAssistantWeather(condition, apparent, rainChance)
+        val currentApparent = numericAttribute(current.attributes, "apparent_temperature")
+        val forecast = runCatching { fetchFirstForecast(baseUrl, token, entityId) }.getOrNull()
+        return HomeAssistantWeather(
+            condition = condition,
+            feelsLikeTemperature = currentApparent ?: forecast?.first,
+            rainChancePercent = forecast?.second,
+        )
     }
 
-    fun fetchRainChance(baseUrl: String, token: String, entityId: String): Int? {
+    /**
+     * Home Assistant's weather.get_forecasts action returns
+     * service_response[entity_id].forecast. Integrations can omit optional fields.
+     */
+    private fun fetchFirstForecast(
+        baseUrl: String,
+        token: String,
+        entityId: String,
+    ): Pair<Double?, Int?>? {
         validateEntityId(entityId)
         val response = SecureHttp.requestJson(
             baseUrl = baseUrl,
@@ -46,28 +58,20 @@ class HomeAssistantClient {
             query = mapOf("return_response" to "true"),
             bearerToken = token,
             method = "POST",
-            jsonBody = JSONObject()
-                .put("entity_id", entityId)
-                .put("type", "hourly"),
+            jsonBody = JSONObject().put("entity_id", entityId).put("type", "hourly"),
         )
         val serviceResponse = response.optJSONObject("service_response")
-            ?: response.optJSONObject("response")
-            ?: response
+            ?: throw IllegalArgumentException("Home Assistant forecast response is missing.")
         val entityResponse = serviceResponse.optJSONObject(entityId)
-        val candidates = mutableListOf<JSONArray>()
-        entityResponse?.optJSONArray("forecast")?.let(candidates::add)
-        serviceResponse.optJSONArray("forecast")?.let(candidates::add)
-        for (key in serviceResponse.keys()) {
-            serviceResponse.optJSONObject(key)?.optJSONArray("forecast")?.let(candidates::add)
-        }
-        for (array in candidates) {
-            for (i in 0 until minOf(array.length(), 48)) {
-                val item = array.optJSONObject(i) ?: continue
-                val probability = item.optDouble("precipitation_probability", Double.NaN)
-                if (probability.isFinite() && probability in 0.0..100.0) {
-                    return probability.roundToInt()
-                }
-            }
+            ?: throw IllegalArgumentException("Home Assistant forecast response does not contain the selected entity.")
+        val forecasts = entityResponse.optJSONArray("forecast") ?: return null
+        for (i in 0 until minOf(forecasts.length(), 48)) {
+            val item = forecasts.optJSONObject(i) ?: continue
+            val apparent = numericValue(item.opt("apparent_temperature"))
+            val probability = numericValue(item.opt("precipitation_probability"))
+                ?.takeIf { it in 0.0..100.0 }
+                ?.roundToInt()
+            if (apparent != null || probability != null) return apparent to probability
         }
         return null
     }
@@ -88,8 +92,10 @@ class HomeAssistantClient {
         return state.state.takeIf { it.isNotBlank() && it.length <= 32 }
     }
 
-    private fun numericAttribute(attributes: JSONObject, name: String): Double? {
-        val value = attributes.opt(name) ?: return null
+    private fun numericAttribute(attributes: JSONObject, name: String): Double? =
+        numericValue(attributes.opt(name))
+
+    private fun numericValue(value: Any?): Double? {
         val number = when (value) {
             is Number -> value.toDouble()
             is String -> value.toDoubleOrNull()

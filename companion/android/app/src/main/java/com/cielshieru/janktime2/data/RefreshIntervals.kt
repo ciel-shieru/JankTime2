@@ -70,17 +70,17 @@ class SnapshotRefresher(private val context: Context) {
                 if (config.weatherEntity.isNotBlank()) {
                     val weather = ha.fetchWeather(base, token, config.weatherEntity)
                     snapshot = snapshot.copy(weatherCondition = weather.condition)
-                    val feelsLike = weather.feelsLikeCelsius?.let { "%.0f°".format(it) }
+                    val feelsLike = weather.feelsLikeTemperature?.let { "%.0f°".format(it) }
                     val rainChance = weather.rainChancePercent?.let { "$it%" }
                     if (feelsLike != null) {
                         snapshot = snapshot.withMetric("weatherFeelsLike", feelsLike)
                     } else {
-                        snapshot = snapshot.withMetric("weatherFeelsLike", "--°", stale = true)
+                        snapshot = snapshot.markStale(listOf("weatherFeelsLike"))
                     }
                     if (rainChance != null) {
                         snapshot = snapshot.withMetric("rainChance", rainChance)
                     } else {
-                        snapshot = snapshot.withMetric("rainChance", "--%", stale = true)
+                        snapshot = snapshot.markStale(listOf("rainChance"))
                     }
                 }
                 for ((id, value) in metrics) snapshot = snapshot.withMetric(id, value)
@@ -97,15 +97,18 @@ class SnapshotRefresher(private val context: Context) {
                 val base = config.prometheusUrl
                 if (config.cpuQuery.isNotBlank()) {
                     val value = prometheus.instantQuery(base, config.cpuQuery, token)
-                    snapshot = snapshot.withMetric("cpuUsage", value ?: "--", stale = value == null)
+                    snapshot = if (value != null) snapshot.withMetric("cpuUsage", value)
+                        else snapshot.markStale(listOf("cpuUsage"))
                 }
                 if (config.memoryQuery.isNotBlank()) {
                     val value = prometheus.instantQuery(base, config.memoryQuery, token)
-                    snapshot = snapshot.withMetric("memoryUsage", value ?: "--", stale = value == null)
+                    snapshot = if (value != null) snapshot.withMetric("memoryUsage", value)
+                        else snapshot.markStale(listOf("memoryUsage"))
                 }
                 if (config.alertQuery.isNotBlank()) {
                     val value = prometheus.instantQuery(base, config.alertQuery, token)
-                    snapshot = snapshot.withMetric("alertCount", value ?: "--", stale = value == null)
+                    snapshot = if (value != null) snapshot.withMetric("alertCount", value)
+                        else snapshot.markStale(listOf("alertCount"))
                 }
                 snapshot = snapshot.succeeded("prometheus", now)
             } catch (_: Exception) {

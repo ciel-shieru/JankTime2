@@ -5,21 +5,34 @@
 
 ## Context
 
-The requested steps, total sleep, restful sleep, and heart-rate history come from Pebble Health/watch sensors. Alloy is the required implementation framework, but the Core Devices Alloy guide identifies HealthService as a C-only capability.
+Steps, total sleep, restful sleep, and heart-rate history must come from Pebble Health. Alloy is the required implementation framework, but the Core Devices Alloy guide identifies HealthService as a C-only capability.
 
 ## Options considered
 
-1. Fabricate values or replace Pebble data with phone-side values. Rejected because it would misrepresent the source and violate the requirement.
-2. Use external Prometheus/Home Assistant sensors. These are not Pebble's own health records.
-3. Add a small C FFI adapter for the HealthService operations that Alloy does not expose, keeping all display and business logic in TypeScript. This is the smallest compatibility boundary.
+1. Fabricate values or replace Pebble data with phone-side values. Rejected because it would misrepresent the source.
+2. Use Home Assistant/Prometheus values. Those are not Pebble's own health records.
+3. Use a narrow C FFI adapter for HealthService while keeping formatting, display logic, and drawing in TypeScript. Chosen as the smallest compatibility boundary.
 
 ## Decision
 
-Choose option 3. During the implementation phase, add a tightly scoped C FFI helper that reads only the required Pebble Health metrics and returns bounded primitive values/samples. The TypeScript watch code owns formatting, graph drawing, time windows, and rendering. Follow the pinned skill's FFI and resource-cleanup guidance and current RePebble API documentation.
+The watch uses src/c/health_ffi.c through the documented Alloy FFI mechanism. The native C functions expose only four bounded primitives: refresh the cached snapshot, read one of four values, read the number of heart samples, and read one sample. mdbl.c sets fxBuildFFI, and manifest.json declares the exact signatures.
+
+## Data semantics
+
+- Steps use health_service_sum_today(HealthMetricStepCount) after checking accessibility for today.
+- Total and restful sleep use their HealthService metrics over a rolling 24-hour window so sessions crossing midnight remain represented.
+- Heart-rate history uses valid minute-level records from the last two hours, down-sampled to at most 16 points. Current BPM uses the newest valid record, falling back to a current reading if minute history is empty.
+- Missing permission/history produces unavailable values and red metric icons; no health values are fabricated.
+- The FFI adapter uses a fixed-size static history buffer and does not dynamically allocate or log measurements.
 
 ## Consequences
 
-- C is limited to the missing platform capability; the project remains TypeScript + Alloy for its primary implementation.
-- Tests must cover missing permissions/history, unavailable sensor samples, and daily boundaries.
-- The heart-rate graph must use a bounded sample count and calculate min/max from the same samples drawn.
-- No continuous second-level redraw is introduced.
+- The package declares the health capability. Pebble Health must be enabled in the Pebble mobile app for readings to be available.
+- TypeScript caches a health snapshot per display minute, so message-driven redraws reuse the last sample.
+- CI validates FFI registration and compilation. Actual HealthService data must still be checked on an emery device with Pebble Health enabled.
+
+## References
+
+- https://developer.repebble.com/guides/events-and-services/health/
+- https://developer.repebble.com/guides/alloy/ffi/
+- https://github.com/coredevices/pebble-watchface-agent-skill

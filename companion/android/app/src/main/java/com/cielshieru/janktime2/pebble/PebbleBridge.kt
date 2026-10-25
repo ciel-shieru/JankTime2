@@ -1,11 +1,12 @@
 package com.cielshieru.janktime2.pebble
 
 import android.content.Context
-import android.util.Log
 import io.rebble.pebblekit2.client.DefaultPebbleAndroidAppPicker
 import io.rebble.pebblekit2.client.DefaultPebbleSender
 import io.rebble.pebblekit2.client.PebbleAndroidAppPicker
 import io.rebble.pebblekit2.common.model.PebbleDictionaryItem
+import io.rebble.pebblekit2.common.model.TransmissionResult
+import java.io.IOException
 import java.util.UUID
 
 /**
@@ -42,7 +43,7 @@ class PebbleBridge(context: Context) : AutoCloseable {
             sendMessage(
                 type = "metric",
                 id = metric,
-                value = value.take(160),
+                value = truncateUtf8(value, MAX_VALUE_BYTES),
                 flags = if (metric in snapshot.staleMetrics) 1 else 0,
                 extra = if (metric == "weatherFeelsLike") snapshot.weatherCondition.orEmpty() else "",
             )
@@ -51,18 +52,16 @@ class PebbleBridge(context: Context) : AutoCloseable {
         snapshot.phoneBluetoothConnected?.let {
             sendMessage("status", "phoneBluetooth", if (it) "1" else "0")
         }
-        snapshot.alarmTime?.let {
-            sendMessage("status", "alarmTime", it, if (snapshot.alarmIsBedtime) 1 else 0)
-        }
+        sendMessage("status", "alarmTime", snapshot.alarmTime ?: "--:--", if (snapshot.alarmIsBedtime) 1 else 0)
         snapshot.currentBpm?.let { sendMessage("status", "heartRate", it.toString()) }
-        snapshot.heartSamples?.takeIf { it.size in 2..56 }?.let { samples ->
+        snapshot.heartSamples?.takeIf { it.size >= 2 }?.take(16)?.let { samples ->
             sendMessage("status", "heartSamples", samples.joinToString(","))
         }
         snapshot.focusRows.take(2).forEachIndexed { index, text ->
-            text?.let { sendMessage("row", "focus." + (index + 1), it.take(200)) }
+            sendMessage("row", "focus." + (index + 1), truncateUtf8(text.orEmpty(), MAX_ROW_BYTES))
         }
         snapshot.calendarRows.take(2).forEachIndexed { index, text ->
-            text?.let { sendMessage("row", "calendar." + (index + 1), it.take(200)) }
+            sendMessage("row", "calendar." + (index + 1), truncateUtf8(text.orEmpty(), MAX_ROW_BYTES))
         }
     }
 
@@ -71,7 +70,7 @@ class PebbleBridge(context: Context) : AutoCloseable {
             "Image must be downscaled to a 30 by 30 one-bit map before transfer."
         }
         if (picker.getCurrentlySelectedApp() == null) return
-        rows.chunked(6).forEachIndexed { chunkIndex, chunk ->
+        rows.chunked(3).forEachIndexed { chunkIndex, chunk ->
             val value = chunk.joinToString(";")
             sendMessage("image", "chunk." + chunkIndex, value, flags = 0)
         }
@@ -84,18 +83,27 @@ class PebbleBridge(context: Context) : AutoCloseable {
         flags: Int = 0,
         extra: String = "",
     ) {
-        require(type.length <= 16 && id.length <= 24 && value.length <= 200 && extra.length <= 48)
-        val values = mapOf<UInt, PebbleDictionaryItem>(
+        require(type.length <= 16 && id.length <= 24 && extra.length <= 48)
+        val valueLimit = if (type == "image") MAX_IMAGE_CHUNK_BYTES else MAX_VALUE_BYTES
+        val boundedValue = truncateUtf8(value, valueLimit)
+        val values = linkedMapOf<UInt, PebbleDictionaryItem>(
             TYPE_KEY to PebbleDictionaryItem.Text(type),
             ID_KEY to PebbleDictionaryItem.Text(id),
-            VALUE_KEY to PebbleDictionaryItem.Text(value),
-            FLAGS_KEY to PebbleDictionaryItem.UInt8(flags),
-            EXTRA_KEY to PebbleDictionaryItem.Text(extra),
+            VALUE_KEY to PebbleDictionaryItem.Text(boundedValue),
         )
-        try {
-            sender.sendDataToPebble(WATCHFACE_UUID, values)
-        } catch (_: Exception) {
-            // Avoid logging payloads, provider values, or sensitive status.
+        if (type == "metric" || (type == "status" && id == "alarmTime") || flags != 0) {
+            values[FLAGS_KEY] = PebbleDictionaryItem.UInt8(flags)
+        }
+        if (extra.isNotEmpty()) values[EXTRA_KEY] = PebbleDictionaryItem.Text(truncateUtf8(extra, MAX_EXTRA_BYTES))
+
+        // The dictionary limit includes key/type/length overhead, not only UTF-8 values.
+        val wireBytes = values.values.sumOf { it.size + ENTRY_OVERHEAD_BYTES }
+        require(wireBytes <= MAX_APP_MESSAGE_BYTES) {
+            "AppMessage payload exceeds the supported dictionary size."
+        }
+        val result = sender.sendDataToPebble(WATCHFACE_UUID, values)
+        if (result.isNullOrEmpty() || result.values.any { it !== TransmissionResult.Success }) {
+            throw IOException("Pebble message was not delivered. Check watch connectivity and ensure JankTime2 is foregrounded.")
         }
     }
 
@@ -110,5 +118,27 @@ class PebbleBridge(context: Context) : AutoCloseable {
         private const val VALUE_KEY = 2u
         private const val FLAGS_KEY = 3u
         private const val EXTRA_KEY = 4u
+        private const val MAX_APP_MESSAGE_BYTES = 124
+        private const val ENTRY_OVERHEAD_BYTES = 4
+        private const val MAX_VALUE_BYTES = 64
+        private const val MAX_ROW_BYTES = 64
+        private const val MAX_IMAGE_CHUNK_BYTES = 96
+        private const val MAX_EXTRA_BYTES = 20
+
+        private fun truncateUtf8(value: String, maxBytes: Int): String {
+            val result = StringBuilder()
+            var bytes = 0
+            var index = 0
+            while (index < value.length) {
+                val codePoint = value.codePointAt(index)
+                val chunk = String(Character.toChars(codePoint))
+                val length = chunk.toByteArray(Charsets.UTF_8).size
+                if (bytes + length > maxBytes) break
+                result.append(chunk)
+                bytes += length
+                index += Character.charCount(codePoint)
+            }
+            return result.toString()
+        }
     }
 }

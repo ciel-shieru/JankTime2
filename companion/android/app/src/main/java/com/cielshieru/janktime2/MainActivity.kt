@@ -93,7 +93,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onChooseImage = { uri ->
                             val rows = withContext(Dispatchers.IO) { imageStore.importFromUri(uri) }
-                            lifecycleScope.launch(Dispatchers.IO) {
+                            withContext(Dispatchers.IO) {
                                 PebbleBridge(applicationContext).use { it.sendImageRows(rows) }
                             }
                         },

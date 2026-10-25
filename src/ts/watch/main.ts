@@ -13,6 +13,7 @@ import {
 } from "./model";
 import { displayState, setBridgeRedraw } from "./bridge";
 import { PREVIEW_MODE } from "./config";
+import { formatSleepMinutes, formatSteps, readHealthSnapshot, type NativeHealthSnapshot } from "./health";
 
 const render = new Poco(screen);
 const paper = render.makeColor(255, 255, 255);
@@ -180,12 +181,39 @@ function drawMetricIcon(metric: MetricId, cx: number, cy: number, stale: boolean
             break;
     }
 }
+let nativeHealth: NativeHealthSnapshot = {
+    steps: null,
+    totalSleepMinutes: null,
+    restfulSleepMinutes: null,
+    currentBpm: null,
+    heartSamples: [],
+};
+let lastHealthMinute = -1;
+
+function refreshHealthForMinute(date: Date): void {
+    const key = Math.floor(date.getTime() / 60000);
+    if (key === lastHealthMinute) return;
+    lastHealthMinute = key;
+    nativeHealth = readHealthSnapshot();
+}
+
+function nativeHealthMetric(metric: MetricId): { value: string; stale: boolean } | null {
+    if (PREVIEW_MODE) return null;
+    switch (metric) {
+        case "steps": return { value: formatSteps(nativeHealth.steps), stale: nativeHealth.steps === null };
+        case "totalSleep": return { value: formatSleepMinutes(nativeHealth.totalSleepMinutes), stale: nativeHealth.totalSleepMinutes === null };
+        case "restfulSleep": return { value: formatSleepMinutes(nativeHealth.restfulSleepMinutes), stale: nativeHealth.restfulSleepMinutes === null };
+        default: return null;
+    }
+}
+
 function drawMetric(slot: SlotId, cx: number, iconY: number, valueY: number, maxWidth: number): void {
     const metric = displayState.slotConfiguration[slot];
     if (metric === "none") return;
     const item = PREVIEW_METRICS[metric];
-    const value = displayState.metricValues[metric] ?? (PREVIEW_MODE ? item.value : "--");
-    const stale = displayState.staleMetrics[metric] ?? (PREVIEW_MODE ? item.stale : true);
+    const nativeValue = nativeHealthMetric(metric);
+    const value = nativeValue?.value ?? displayState.metricValues[metric] ?? (PREVIEW_MODE ? item.value : "--");
+    const stale = nativeValue?.stale ?? displayState.staleMetrics[metric] ?? (PREVIEW_MODE ? item.stale : true);
     drawMetricIcon(metric, cx, iconY, stale);
     centered(clipped(value, valueFont, maxWidth), valueFont, black, cx, valueY);
 }
@@ -215,19 +243,31 @@ function drawPlanet(): void {
 
 function drawWeatherCondition(cx: number, cy: number, color: unknown, condition: string | null): void {
     const value = (condition ?? "").toLowerCase();
-    const sunny = value.includes("sunny") || value.includes("clear");
-    const cloudy = value.includes("cloud") || value.includes("overcast") || value.includes("partly");
+    const unknown = value === "" || value === "unknown" || value === "unavailable" || value === "none";
+    if (unknown) {
+        render.drawText("?", smallFont, color, cx - 3, cy - 7);
+        return;
+    }
+    const clearNight = value === "clear-night";
+    const sunny = value === "sunny" || (value === "clear" && !clearNight);
+    const partlyCloudy = value === "partlycloudy" || value === "partly-cloudy";
+    const cloudy = partlyCloudy || value.includes("cloud") || value.includes("overcast");
     const rainy = value.includes("rain") || value.includes("pour");
     const snowy = value.includes("snow") || value.includes("hail");
     const foggy = value.includes("fog") || value.includes("mist");
     const stormy = value.includes("lightning") || value.includes("thunder");
-    if (sunny || (!cloudy && !rainy && !snowy && !foggy && !stormy)) {
+    const windy = value.includes("windy");
+    if (sunny || clearNight || partlyCloudy) {
         circle(cx - 3, cy - 4, 4, color);
         line(cx - 3, cy - 11, cx - 3, cy - 9, color);
         line(cx - 10, cy - 4, cx - 8, cy - 4, color);
         line(cx + 2, cy - 9, cx + 3, cy - 8, color);
+        if (clearNight) {
+            circle(cx - 1, cy - 4, 3, black);
+            circle(cx + 1, cy - 5, 3, paper);
+        }
     }
-    if (cloudy || rainy || snowy || foggy || stormy) {
+    if (cloudy || rainy || snowy || foggy || stormy || windy) {
         circle(cx + 1, cy + 1, 5, black);
         circle(cx + 7, cy, 4, black);
         render.drawRoundRect(cx - 4, cy, 15, 6, black, 2);
@@ -251,12 +291,16 @@ function drawWeatherCondition(cx: number, cy: number, color: unknown, condition:
         line(cx + 2, cy + 5, cx - 1, cy + 9, yellow, 2);
         line(cx - 1, cy + 9, cx + 2, cy + 9, yellow, 2);
         line(cx + 2, cy + 9, cx, cy + 12, yellow, 2);
+    } else if (windy) {
+        line(cx - 5, cy + 7, cx + 8, cy + 7, color, 1);
+        line(cx - 3, cy + 10, cx + 5, cy + 10, color, 1);
     }
 }
+
 function drawHeartRate(): void {
-    const samples = displayState.heartSamples ?? (PREVIEW_MODE ? heartSamples : []);
-    const bpm = displayState.currentBpm ?? (PREVIEW_MODE ? currentBpm : null);
-    const fresh = displayState.currentBpm !== null || PREVIEW_MODE;
+    const samples = PREVIEW_MODE ? (displayState.heartSamples ?? heartSamples) : nativeHealth.heartSamples;
+    const bpm = PREVIEW_MODE ? (displayState.currentBpm ?? currentBpm) : nativeHealth.currentBpm;
+    const fresh = PREVIEW_MODE || nativeHealth.currentBpm !== null || nativeHealth.heartSamples.length >= 2;
     const heartColor = fresh ? blue : red;
     circle(8, 140, 4, heartColor); circle(14, 140, 4, heartColor);
     line(4, 141, 11, 149, heartColor, 2); line(18, 141, 11, 149, heartColor, 2);
@@ -324,6 +368,7 @@ function drawStatus(date: Date): void {
 }
 function draw(event?: AlloyWatchMinuteEvent): void {
     lastDate = event?.date ?? lastDate;
+    refreshHealthForMinute(lastDate);
     render.begin();
     render.fillRectangle(paper, 0, 0, render.width, render.height);
     drawStatus(lastDate);

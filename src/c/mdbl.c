@@ -16,7 +16,8 @@ int main(void) {
     .recordSize = sizeof(ModdableCreationRecord),
     .stack = 5120,
     .slot = 31744,
-    .chunk = 19456
+    .chunk = 19456,
+    .fxBuildFFI = fxBuildFFI
   });
 
   window_destroy(w);
