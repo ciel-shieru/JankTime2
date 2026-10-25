@@ -115,18 +115,20 @@ jobs:
           sha256sum release/janktime2-emery-production.pbw | awk '{print $1 "  janktime2-emery-production.pbw"}' > release/janktime2-emery-production.pbw.sha256
 
       - name: Upload production Pebble watchface (.pbw)
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: janktime2-emery-production.pbw
           path: release/janktime2-emery-production.pbw
+          archive: false
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload production watchface SHA-256 checksum
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: janktime2-emery-production.pbw.sha256
           path: release/janktime2-emery-production.pbw.sha256
+          archive: false
           if-no-files-found: error
           retention-days: 30
 
@@ -162,37 +164,41 @@ jobs:
 
       - name: Upload emulator screenshot
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: screenshot_emery.png
           path: artifacts/screenshot_emery.png
+          archive: false
           if-no-files-found: warn
           retention-days: 14
 
       - name: Upload emulator startup log
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pebble-logs.txt
           path: artifacts/pebble-logs.txt
+          archive: false
           if-no-files-found: warn
           retention-days: 14
 
       - name: Upload Pebble SDK diagnostics
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pebble-sdk-list.txt
           path: artifacts/pebble-sdk-list.txt
+          archive: false
           if-no-files-found: warn
           retention-days: 14
 
       - name: Upload Pebble tool version
         if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pebble-tool-version.txt
           path: artifacts/pebble-tool-version.txt
+          archive: false
           if-no-files-found: warn
           retention-days: 14
 
@@ -277,10 +283,11 @@ jobs:
 
       - name: Upload debug APK for integration testing
         if: success()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: app-debug.apk
           path: companion/android/app/build/outputs/apk/debug/app-debug.apk
+          archive: false
           if-no-files-found: error
           retention-days: 14
 
