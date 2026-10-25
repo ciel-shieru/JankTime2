@@ -5,6 +5,7 @@
 
     <queries>
         <provider android:authorities="com.cielshieru.wakey.pebble-export" />
+        <package android:name="com.anopticlabs.gravel" />
         <intent>
             <action android:name="io.rebble.pebblekit2.SEND_DATA_TO_WATCH" />
         </intent>
