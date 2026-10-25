@@ -1,6 +1,4 @@
 import Poco from "commodetto/Poco";
-import parseBMF from "commodetto/parseBMF";
-import parseRLE from "commodetto/parseRLE";
 import Battery from "embedded:sensor/Battery";
 import {
     PREVIEW_METRICS,
@@ -22,15 +20,13 @@ const blue = render.makeColor(0, 170, 224);
 const yellow = render.makeColor(238, 191, 24);
 const red = render.makeColor(225, 32, 38);
 
-function loadFont(size: number): PocoFont {
-    const font = parseBMF(new Resource("Jersey10-Regular-" + size + ".fnt"));
-    font.bitmap = parseRLE(new Resource("Jersey10-Regular-" + size + "-alpha.bm4"));
-    return font;
+function systemFont(size: 9 | 14 | 18 | 24 | 28 | 36, bold = false): PocoFont {
+    return new render.Font(bold ? "Gothic-Bold" : "Gothic-Regular", size);
 }
-const statusFont = loadFont(12);
-const valueFont = loadFont(16);
-const smallFont = loadFont(12);
-const clockFont = loadFont(42);
+const statusFont = systemFont(14);
+const valueFont = systemFont(14);
+const smallFont = systemFont(9);
+const clockFont = systemFont(28);
 
 let lastDate = new Date();
 let watchBatteryPercent: number | null = null;
@@ -49,8 +45,11 @@ const heartSamples = [
     64, 68, 74, 82, 92, 81, 73, 67, 62, 57, 54, 60, 66, 72,
 ];
 
-function centered(text: string, font: PocoFont, color: unknown, cx: number, y: number): void {
-    render.drawText(text, font, color, Math.floor(cx - render.getTextWidth(text, font) / 2), y);
+function centered(text: string, font: PocoFont, color: unknown, cx: number, baselineY: number): void {
+    render.drawText(text, font, color, Math.floor(cx - render.getTextWidth(text, font) / 2), baselineY - font.height);
+}
+function drawBaseline(text: string, font: PocoFont, color: unknown, x: number, baselineY: number): void {
+    render.drawText(text, font, color, x, baselineY - font.height);
 }
 function clipped(text: string, font: PocoFont, width: number): string {
     return clipByWidth(text, width, (candidate) => render.getTextWidth(candidate, font));
@@ -90,7 +89,7 @@ function drawBattery(x: number, y: number, width: number, percent: number | null
     render.frameRoundRect(x, y, width - 3, 12, color, 1);
     render.drawRoundRect(x + width - 3, y + 3, 3, 6, color, 1);
     const safe = percent === null ? null : Math.max(0, Math.min(100, Math.trunc(percent)));
-    centered(safe === null ? "--%" : String(safe) + "%", smallFont, black, x + Math.floor((width - 3) / 2), y + 1);
+    centered(safe === null ? "--%" : String(safe) + "%", smallFont, black, x + Math.floor((width - 3) / 2), y + 10);
 }
 function drawMetricIcon(metric: MetricId, cx: number, cy: number, stale: boolean): void {
     const color = stale ? red : blue;
@@ -311,7 +310,7 @@ function drawHeartRate(): void {
     const heartColor = heartFresh ? blue : red;
     circle(8, 140, 4, heartColor); circle(14, 140, 4, heartColor);
     line(4, 141, 11, 149, heartColor, 2); line(18, 141, 11, 149, heartColor, 2);
-    render.drawText(bpm === null ? "--" : String(bpm), valueFont, black, 22, 137);
+    drawBaseline(bpm === null ? "--" : String(bpm), valueFont, black, 22, 149);
 
     if (samples.length >= 2) {
         let minimum = samples[0] ?? 0;
@@ -346,14 +345,14 @@ function drawRows(): void {
         displayState.calendarRows[1] ?? (PREVIEW_MODE ? formatCalendarRow("15:30", "Home", "Model eval run") : ""),
     ];
     line(5, 153, 195, 153, black);
-    render.drawText(clipped(focus[0] ?? "", smallFont, 190), smallFont, black, 6, 159);
-    render.drawText(clipped(focus[1] ?? "", smallFont, 190), smallFont, black, 6, 174);
+    drawBaseline(clipped(focus[0] ?? "", smallFont, 190), smallFont, black, 6, 169);
+    drawBaseline(clipped(focus[1] ?? "", smallFont, 190), smallFont, black, 6, 184);
     line(5, 188, 195, 188, black);
-    render.drawText(clipped(events[0] ?? "", smallFont, 190), smallFont, black, 6, 196);
-    render.drawText(clipped(events[1] ?? "", smallFont, 190), smallFont, black, 6, 210);
+    drawBaseline(clipped(events[0] ?? "", smallFont, 190), smallFont, black, 6, 207);
+    drawBaseline(clipped(events[1] ?? "", smallFont, 190), smallFont, black, 6, 221);
 }
 function drawStatus(date: Date): void {
-    render.drawText(labelDate(date), statusFont, black, 5, 3);
+    drawBaseline(labelDate(date), statusFont, black, 5, 15);
     const previewAlarm = PREVIEW_MODE ? formatTime24(previewAlarmAt) : null;
     const alarmTime = displayState.alarmTime ?? previewAlarm;
     const bedtime = displayState.alarmTime !== null
@@ -365,9 +364,10 @@ function drawStatus(date: Date): void {
     } else {
         drawAlarm(62, 9, alarmTime === null ? red : black);
     }
-    render.drawText(alarmTime ?? "--:--", statusFont, black, 71, 3);
-    const phoneBluetoothConnected = displayState.phoneBluetoothConnected;
-    const bluetoothConnected = watch.connected.app && phoneBluetoothConnected === true;
+    drawBaseline(alarmTime ?? "--:--", statusFont, black, 71, 15);
+    // The PebbleKit connection is the authoritative live phone/watch connection state.
+    // Do not mark it red merely because an optional phone-status payload is absent.
+    const bluetoothConnected = watch.connected.app;
     drawBluetooth(111, 10, bluetoothConnected ? blue : red);
     drawBattery(126, 4, 32, displayState.phoneBatteryPercent ?? (PREVIEW_MODE ? previewPhoneBatteryPercent : null), yellow);
     drawBattery(163, 4, 34, watchBatteryPercent, blue);
@@ -384,17 +384,17 @@ function draw(event?: AlloyWatchMinuteEvent): void {
         ["grid.top.1", 20], ["grid.top.2", 60], ["grid.top.3", 100],
         ["grid.top.4", 140], ["grid.top.5", 180],
     ] as const;
-    for (const [slot, x] of rowOne) drawMetric(slot, x, 34, 44, 36);
+    for (const [slot, x] of rowOne) drawMetric(slot, x, 34, 58, 36);
 
-    drawMetric("grid.bottom.1", 20, 68, 80, 36);
-    drawMetric("grid.bottom.2", 60, 68, 80, 36);
+    drawMetric("grid.bottom.1", 20, 68, 94, 36);
+    drawMetric("grid.bottom.2", 60, 68, 94, 36);
     drawPlanet();
-    drawMetric("grid.bottom.4", 140, 68, 80, 36);
-    drawMetric("grid.bottom.5", 180, 68, 80, 36);
+    drawMetric("grid.bottom.4", 140, 68, 94, 36);
+    drawMetric("grid.bottom.5", 180, 68, 94, 36);
 
-    centered(formatTime24(lastDate), clockFont, black, 100, 87);
-    drawMetric("clock.left", 20, 107, 119, 36);
-    drawMetric("clock.right", 180, 107, 119, 36);
+    centered(formatTime24(lastDate), clockFont, black, 100, 116);
+    drawMetric("clock.left", 20, 123, 142, 36);
+    drawMetric("clock.right", 180, 123, 142, 36);
     drawHeartRate();
     drawRows();
     render.end();
