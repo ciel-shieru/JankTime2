@@ -70,6 +70,9 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     const companionBridge = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/pebble/PebbleBridge.kt");
     assert.match(companionBridge, /senderDelegate = lazy/);
     assert.match(companionBridge, /Service not registered/);
+    assert.match(companionBridge, /FailedDifferentAppOpen/);
+    assert.match(companionBridge, /Open the JankTime2 watchface on the Pebble before refreshing/);
+    assert.match(companionBridge, /FailedNoPermissions/);
     assert.doesNotMatch(renderer, /String\(safe\) \+ "%"/);
     assert.match(renderer, /const bluetoothConnected = watch\.connected\.app/);
     assert.match(renderer, /baselineY - font\.height/);

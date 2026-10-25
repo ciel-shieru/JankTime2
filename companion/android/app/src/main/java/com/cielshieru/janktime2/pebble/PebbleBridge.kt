@@ -113,8 +113,27 @@ class PebbleBridge(context: Context) : AutoCloseable {
         }
         senderUsed = true
         val result = sender.sendDataToPebble(WATCHFACE_UUID, values)
-        if (result.isNullOrEmpty() || result.values.any { it !== TransmissionResult.Success }) {
-            throw IOException("Pebble message was not delivered. Check watch connectivity and ensure JankTime2 is foregrounded.")
+        if (result.isNullOrEmpty()) {
+            throw IOException("No connected Pebble watch acknowledged the data. Check the watch's Bluetooth connection and selected mobile-app bridge.")
+        }
+        val failure = result.values.firstOrNull { it !== TransmissionResult.Success }
+        if (failure != null) {
+            val reason = when (failure) {
+                TransmissionResult.FailedWatchNotConnected ->
+                    "The Pebble watch is not connected. Reconnect it and refresh again."
+                TransmissionResult.FailedDifferentAppOpen ->
+                    "Open the JankTime2 watchface on the Pebble before refreshing; AppMessage is delivered only to the foreground watch app."
+                TransmissionResult.FailedNoPermissions ->
+                    "The mobile app denied AppMessage access. Check that this watchface UUID and companion package are permitted by the installed Pebble mobile app."
+                TransmissionResult.FailedTimeout ->
+                    "The watch did not acknowledge AppMessage before timeout. Check Bluetooth connectivity and retry."
+                TransmissionResult.FailedWatchNacked ->
+                    "The watch rejected the data packet. Update/reinstall the matching JankTime2 watchface and retry."
+                is TransmissionResult.Unknown ->
+                    "The mobile-app bridge returned an unknown AppMessage result. Update the Pebble mobile app or choose another compatible bridge."
+                TransmissionResult.Success -> null
+            }
+            if (reason != null) throw IOException(reason)
         }
     }
 
