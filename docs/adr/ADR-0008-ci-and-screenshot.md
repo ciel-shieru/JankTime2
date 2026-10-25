@@ -15,7 +15,7 @@ The repository needs predictable validation for TypeScript/Alloy changes and a s
 
 ## Decision
 
-Choose option 3. Pin actions to immutable Git commit SHAs and set minimal workflow permissions. Pin Node.js 22.16.0, Python 3.12, Pebble Tool 5.0.40, Pebble SDK 4.33.1, and TypeScript 5.9.3. Install JavaScript dependencies with lifecycle scripts disabled. The CI runs lint, typecheck, tests, TypeScript generation, pebble build, installs on the emery emulator, captures a screenshot, captures diagnostic logs, and uploads those outputs as a GitHub Actions artifact.
+Choose option 3. Pin actions to immutable Git commit SHAs and set minimal workflow permissions. Pin Node.js 22.16.0, Python 3.12.15, JDK 17.0.21+9, Pebble Tool 5.0.40, Pebble SDK 4.33.1, Android SDK platform 36 / build-tools 36.0.0, and TypeScript 5.9.3. Emulator libraries are installed from a fixed Ubuntu archive snapshot with exact versions and APT SHA-256 validation. Install JavaScript dependencies with lifecycle scripts disabled. The CI runs lint, typecheck, tests, TypeScript generation, pebble build, installs on the emery emulator, captures a screenshot, captures diagnostic logs, and uploads those outputs as a GitHub Actions artifact.
 
 ## Consequences
 
