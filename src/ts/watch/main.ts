@@ -263,7 +263,7 @@ function drawStatus(date: Date): void {
     }
     render.drawText(selected?.time ?? formatTime24(previewAlarmAt), statusFont, black, 71, 3);
     const phoneBluetoothConnected = displayState.phoneBluetoothConnected;
-    const bluetoothConnected = watch.connected.app && phoneBluetoothConnected !== false;
+    const bluetoothConnected = watch.connected.app && phoneBluetoothConnected === true;
     drawBluetooth(111, 10, bluetoothConnected ? blue : red);
     drawBattery(126, 4, 32, displayState.phoneBatteryPercent ?? previewPhoneBatteryPercent, yellow);
     drawBattery(163, 4, 34, watchBatteryPercent, blue);

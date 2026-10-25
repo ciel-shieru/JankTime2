@@ -59,6 +59,10 @@ test("all accepted architecture decisions are present", () => {
         "../docs/adr/ADR-0009-pixel-font-and-layout-renderer.md",
         "../docs/adr/ADR-0010-appmessage-protocol.md",
         "../docs/adr/ADR-0011-alloy-memory-budget.md",
+        "../docs/adr/ADR-0012-home-assistant-provider.md",
+        "../docs/adr/ADR-0013-prometheus-alertmanager-provider.md",
+        "../docs/adr/ADR-0014-android-calendar-provider.md",
+        "../docs/adr/ADR-0015-image-and-epaper-rendering.md",
     ]) {
         assert.ok(existsSync(new URL(path, import.meta.url)), "Missing ADR: " + path);
     }
