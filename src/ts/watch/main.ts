@@ -143,18 +143,13 @@ function drawMetricIcon(metric: MetricId, cx: number, cy: number, stale: boolean
             line(cx + 7, cy + 5, cx + 7, cy + 8, color);
             break;
         case "weatherFeelsLike":
+            drawWeatherCondition(cx, cy, color, displayState.weatherCondition);
+            break;
         case "rainChance":
-            circle(cx - 3, cy - 4, 4, color);
-            line(cx - 3, cy - 11, cx - 3, cy - 9, color);
-            line(cx - 10, cy - 4, cx - 8, cy - 4, color);
-            circle(cx + 3, cy + 2, 5, black); circle(cx + 8, cy + 1, 4, black);
-            render.drawRoundRect(cx - 2, cy + 1, 14, 5, black, 2);
-            circle(cx + 3, cy + 2, 3, paper); circle(cx + 8, cy + 1, 2, paper);
-            render.drawRoundRect(cx, cy + 2, 10, 3, paper, 1);
-            if (metric === "rainChance") {
-                line(cx - 4, cy + 7, cx - 6, cy + 10, color, 2);
-                line(cx + 3, cy + 7, cx + 1, cy + 10, color, 2);
-            }
+            drawWeatherCondition(cx, cy, color, displayState.weatherCondition);
+            line(cx - 4, cy + 7, cx - 6, cy + 10, color, 2);
+            line(cx + 3, cy + 7, cx + 1, cy + 10, color, 2);
+            line(cx + 8, cy + 7, cx + 6, cy + 10, color, 2);
             break;
         case "alertCount":
             line(cx - 7, cy + 5, cx - 5, cy + 2, color, 2);
@@ -195,7 +190,19 @@ function drawMetric(slot: SlotId, cx: number, iconY: number, valueY: number, max
     centered(clipped(value, valueFont, maxWidth), valueFont, black, cx, valueY);
 }
 function drawPlanet(): void {
+    const rows = displayState.imageRows;
+    if (rows !== null && rows.length === 30 && rows.every((row) => /^[01]{30}$/.test(row))) {
+        for (let y = 0; y < 30; y++) {
+            const row = rows[y] ?? "";
+            for (let x = 0; x < 30; x++) {
+                if (row[x] === "1") render.fillRectangle(black, 85 + x, 58 + y, 1, 1);
+            }
+        }
+        return;
+    }
+
     render.frameRoundRect(85, 58, 30, 30, blue, 1);
+    if (!PREVIEW_MODE) return;
     circle(92, 66, 1, blue); circle(109, 64, 1, blue);
     circle(110, 81, 1, blue); circle(92, 83, 1, blue);
     circle(100, 73, 7, blue);
@@ -204,6 +211,47 @@ function drawPlanet(): void {
     line(90, 71, 98, 76, paper, 2);
     line(98, 68, 103, 73, paper, 2);
     line(101, 71, 106, 76, paper, 2);
+}
+
+function drawWeatherCondition(cx: number, cy: number, color: unknown, condition: string | null): void {
+    const value = (condition ?? "").toLowerCase();
+    const sunny = value.includes("sunny") || value.includes("clear");
+    const cloudy = value.includes("cloud") || value.includes("overcast") || value.includes("partly");
+    const rainy = value.includes("rain") || value.includes("pour");
+    const snowy = value.includes("snow") || value.includes("hail");
+    const foggy = value.includes("fog") || value.includes("mist");
+    const stormy = value.includes("lightning") || value.includes("thunder");
+    if (sunny || (!cloudy && !rainy && !snowy && !foggy && !stormy)) {
+        circle(cx - 3, cy - 4, 4, color);
+        line(cx - 3, cy - 11, cx - 3, cy - 9, color);
+        line(cx - 10, cy - 4, cx - 8, cy - 4, color);
+        line(cx + 2, cy - 9, cx + 3, cy - 8, color);
+    }
+    if (cloudy || rainy || snowy || foggy || stormy) {
+        circle(cx + 1, cy + 1, 5, black);
+        circle(cx + 7, cy, 4, black);
+        render.drawRoundRect(cx - 4, cy, 15, 6, black, 2);
+        circle(cx + 1, cy + 1, 3, paper);
+        circle(cx + 7, cy, 2, paper);
+        render.drawRoundRect(cx - 2, cy + 1, 10, 4, paper, 1);
+    }
+    if (rainy) {
+        line(cx - 3, cy + 7, cx - 5, cy + 10, color, 2);
+        line(cx + 3, cy + 7, cx + 1, cy + 10, color, 2);
+        line(cx + 8, cy + 7, cx + 6, cy + 10, color, 2);
+    } else if (snowy) {
+        line(cx - 3, cy + 7, cx - 3, cy + 10, color, 1);
+        line(cx - 5, cy + 8, cx - 1, cy + 8, color, 1);
+        line(cx + 5, cy + 7, cx + 5, cy + 10, color, 1);
+        line(cx + 3, cy + 8, cx + 7, cy + 8, color, 1);
+    } else if (foggy) {
+        line(cx - 6, cy + 7, cx + 8, cy + 7, color, 1);
+        line(cx - 5, cy + 10, cx + 7, cy + 10, color, 1);
+    } else if (stormy) {
+        line(cx + 2, cy + 5, cx - 1, cy + 9, yellow, 2);
+        line(cx - 1, cy + 9, cx + 2, cy + 9, yellow, 2);
+        line(cx + 2, cy + 9, cx, cy + 12, yellow, 2);
+    }
 }
 function drawHeartRate(): void {
     const samples = displayState.heartSamples ?? (PREVIEW_MODE ? heartSamples : []);

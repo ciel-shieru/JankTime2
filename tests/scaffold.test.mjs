@@ -39,7 +39,7 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(model, /function selectAlarmOrBedtime/);
     assert.match(model, /function clipByWidth/);
     const workflow = read("../.github/workflows/ci.yml");
-    assert.match(workflow, /check_screenshot\\.py/);
+    assert.match(workflow, /check_screenshot\.py/);
     const manifest = JSON.parse(read("../src/embeddedjs/manifest.json"));
     const fontSizes = manifest.resources["*-alpha"].map((resource) => resource.size);
     assert.deepEqual(fontSizes, [12, 16, 42]);

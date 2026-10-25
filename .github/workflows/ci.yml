@@ -103,3 +103,47 @@ jobs:
           path: artifacts/
           if-no-files-found: warn
           retention-days: 14
+
+  companion:
+    name: Android companion tests, lint, and APK
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165 # v4.7.1
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            companion/android/**/*.gradle*
+            companion/android/gradle/libs.versions.toml
+
+      - name: Install Android SDK platform
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager_bin="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -x "$sdkmanager_bin"
+          yes | "$sdkmanager_bin" --licenses >/dev/null || true
+          "$sdkmanager_bin" "platforms;android-37"
+
+      - name: Run companion tests, lint, and build
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x companion/android/gradlew
+          ./companion/android/gradlew -p companion/android --no-daemon \
+            :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+
+      - name: Upload debug APK for integration testing
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: janktime2-android-companion-debug
+          path: companion/android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14

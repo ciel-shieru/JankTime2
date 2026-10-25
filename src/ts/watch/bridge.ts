@@ -89,6 +89,7 @@ function handleMessage(message: IncomingMessage): void {
     const id = asText(message.get("ID"), 24);
     const value = message.get("VALUE");
     const flags = message.get("FLAGS");
+    const extra = asText(message.get("EXTRA"), 48);
     if (kind === null || id === null) return;
 
     if (kind === "slot") {
@@ -106,6 +107,22 @@ function handleMessage(message: IncomingMessage): void {
         if (metric === null || metric === "none" || text === null || stale === null) return;
         displayState.metricValues[metric] = text;
         displayState.staleMetrics[metric] = stale;
+        if (metric === "weatherFeelsLike" && extra !== null && extra.length > 0) {
+            displayState.weatherCondition = extra.toLowerCase();
+        }
+        changed();
+        return;
+    }
+    if (kind === "image") {
+        const match = /^chunk\.[0-4]$/.exec(id);
+        const chunkIndex = match === null ? -1 : Number(id.slice(6));
+        const text = asText(value, 190);
+        if (chunkIndex < 0 || text === null) return;
+        const chunkRows = text.split(";");
+        if (chunkRows.length !== 6 || !chunkRows.every((row) => /^[01]{30}$/.test(row))) return;
+        const rows = displayState.imageRows?.slice() ?? Array.from({ length: 30 }, () => "");
+        for (let i = 0; i < chunkRows.length; i++) rows[chunkIndex * 6 + i] = chunkRows[i] ?? "";
+        displayState.imageRows = rows;
         changed();
         return;
     }
