@@ -28,7 +28,7 @@ The watch uses src/c/health_ffi.c through the documented Alloy FFI mechanism. Th
 ## Consequences
 
 - The package declares the health capability. Pebble Health must be enabled in the Pebble mobile app for readings to be available.
-- TypeScript caches a health snapshot per display minute, so message-driven redraws reuse the last sample.
+- TypeScript refreshes HealthService at most once per display minute and persists a small, schema-checked last-known-good snapshot in Alloy localStorage. If a reading disappears temporarily, the cached value remains visible with a red/stale icon; the step cache resets when the local date changes. Message-driven redraws reuse the same minute snapshot.
 - CI validates FFI registration and compilation. Actual HealthService data must still be checked on an emery device with Pebble Health enabled.
 
 ## References

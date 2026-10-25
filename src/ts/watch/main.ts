@@ -200,9 +200,9 @@ function refreshHealthForMinute(date: Date): void {
 function nativeHealthMetric(metric: MetricId): { value: string; stale: boolean } | null {
     if (PREVIEW_MODE) return null;
     switch (metric) {
-        case "steps": return { value: formatSteps(nativeHealth.steps), stale: nativeHealth.steps === null };
-        case "totalSleep": return { value: formatSleepMinutes(nativeHealth.totalSleepMinutes), stale: nativeHealth.totalSleepMinutes === null };
-        case "restfulSleep": return { value: formatSleepMinutes(nativeHealth.restfulSleepMinutes), stale: nativeHealth.restfulSleepMinutes === null };
+        case "steps": return { value: formatSteps(nativeHealth.steps), stale: nativeHealth.stepsStale };
+        case "totalSleep": return { value: formatSleepMinutes(nativeHealth.totalSleepMinutes), stale: nativeHealth.totalSleepStale };
+        case "restfulSleep": return { value: formatSleepMinutes(nativeHealth.restfulSleepMinutes), stale: nativeHealth.restfulSleepStale };
         default: return null;
     }
 }
@@ -300,8 +300,9 @@ function drawWeatherCondition(cx: number, cy: number, color: unknown, condition:
 function drawHeartRate(): void {
     const samples = PREVIEW_MODE ? (displayState.heartSamples ?? heartSamples) : nativeHealth.heartSamples;
     const bpm = PREVIEW_MODE ? (displayState.currentBpm ?? currentBpm) : nativeHealth.currentBpm;
-    const fresh = PREVIEW_MODE || nativeHealth.currentBpm !== null || nativeHealth.heartSamples.length >= 2;
-    const heartColor = fresh ? blue : red;
+    const heartFresh = PREVIEW_MODE || !nativeHealth.currentBpmStale;
+    const graphFresh = PREVIEW_MODE || !nativeHealth.heartSamplesStale;
+    const heartColor = heartFresh ? blue : red;
     circle(8, 140, 4, heartColor); circle(14, 140, 4, heartColor);
     line(4, 141, 11, 149, heartColor, 2); line(18, 141, 11, 149, heartColor, 2);
     render.drawText(bpm === null ? "--" : String(bpm), valueFont, black, 22, 137);
@@ -321,7 +322,7 @@ function drawHeartRate(): void {
             const sample = samples[i] ?? minimum;
             const x = left + Math.round(i * (right - left) / (samples.length - 1));
             const y = bottom - Math.round((sample - minimum) * (bottom - top) / span);
-            line(px, py, x, y, fresh ? blue : red);
+            line(px, py, x, y, graphFresh ? blue : red);
             px = x; py = y;
         }
         centered(String(minimum) + "/" + String(maximum), smallFont, black, 179, 138);
