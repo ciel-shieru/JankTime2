@@ -5,6 +5,11 @@ declare const Natives: {
     health_sample(index: number): number;
 };
 
+declare const localStorage: {
+    getItem(key: string): string | null;
+    setItem(key: string, value: string): void;
+};
+
 export interface NativeHealthSnapshot {
     readonly steps: number | null;
     readonly totalSleepMinutes: number | null;

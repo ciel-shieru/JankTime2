@@ -122,7 +122,7 @@ class SnapshotRefresher(private val context: Context) {
                 val token = credentials.get("mindwtr")
                     ?: throw IllegalStateException("Mindwtr token is not configured.")
                 val result = mindwtr.fetchTodayFocus(config.mindwtrUrl, token)
-                snapshot = snapshot.withMetric("focusCount", result.remaining.toString() + "/" + result.total)
+                snapshot = snapshot.withMetric("focusCount", result.remaining.toString() + " / " + result.total)
                 snapshot = snapshot.copy(focusRows = listOf(result.rows.getOrNull(0), result.rows.getOrNull(1)))
                 snapshot = snapshot.succeeded("mindwtr", now)
             } catch (_: Exception) {

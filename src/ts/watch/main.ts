@@ -187,6 +187,11 @@ let nativeHealth: NativeHealthSnapshot = {
     restfulSleepMinutes: null,
     currentBpm: null,
     heartSamples: [],
+    stepsStale: true,
+    totalSleepStale: true,
+    restfulSleepStale: true,
+    currentBpmStale: true,
+    heartSamplesStale: true,
 };
 let lastHealthMinute = -1;
 

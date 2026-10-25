@@ -57,7 +57,7 @@ export const DEFAULT_SLOT_CONFIGURATION: Readonly<SlotConfiguration> = Object.fr
 
 export const PREVIEW_METRICS: Readonly<Record<MetricId, MetricPreview>> = Object.freeze({
     none: { value: "", icon: "none", stale: false },
-    focusCount: { value: "4/7", icon: "focusCount", stale: false },
+    focusCount: { value: "4 / 7", icon: "focusCount", stale: false },
     steps: { value: "8.4k", icon: "steps", stale: false },
     totalSleep: { value: "7h42", icon: "totalSleep", stale: false },
     restfulSleep: { value: "1h38", icon: "restfulSleep", stale: false },
