@@ -7,7 +7,7 @@
 
 The first emulator screenshot revealed that a successful package build and screenshot command do not prove the Alloy VM launched successfully. The 200×228 screenshot displayed **Alloy: Fatal Error — memory full**. RePebble's Alloy Reference documents that moddable_createMachine(NULL) uses a default 32 KiB static pool, divided among the slot heap, chunk heap, and stack. It also documents the ModdableCreationRecord mechanism for setting those sizes.
 
-JankTime2 loads custom bitmap fonts for compact status and metric labels and a clock font, then maintains drawing state and an AppMessage receiver. The default VM pool was insufficient for the current startup/resource peak. An initial larger allocation above the reference's example also caused the emulator connection to fail before screenshot capture, so the heap must be increased conservatively.
+JankTime2 loads custom bitmap fonts for compact status and metric labels and a clock font, then maintains drawing state and an AppMessage receiver. The default VM pool was insufficient for the current startup/resource peak. An initial larger allocation above the reference's example also caused the emulator connection to fail before screenshot capture, so the heap must be increased conservatively. After adding persistent HealthService caching, the startup log again reported `Error: no memory (in build)`. Because the prior allocation was already above the default, the first response is to keep the health module and loaded resources compact rather than immediately increasing the static pool.
 
 ## Options considered
 
@@ -24,7 +24,7 @@ CI captures the emery screenshot and runs scripts/check_screenshot.py. The check
 ## Consequences
 
 - Editing the normal mdbl.c template is justified for this documented runtime-memory requirement; do not make unrelated boot-code changes.
-- Every added font size, Unicode block, module, large string, or graph buffer must be considered in runtime-memory review.
+- Every added font size, Unicode block, module, large string, or graph buffer must be considered in runtime-memory review. The HealthService cache is schema-checked and compact; do not grow it with verbose parsing helpers or duplicate values.
 - A green CI run requires both package build success and a screenshot that passes the fatal-screen smoke check.
 - The first successful screenshot must still be inspected for visual fidelity, alignment, clipping, colors, and e-paper behavior.
 

@@ -4,7 +4,6 @@ declare const Natives: {
     health_sample_count(): number;
     health_sample(index: number): number;
 };
-
 declare const localStorage: {
     getItem(key: string): string | null;
     setItem(key: string, value: string): void;
@@ -23,18 +22,51 @@ export interface NativeHealthSnapshot {
     readonly heartSamplesStale: boolean;
 }
 
-interface PersistedHealthSnapshot {
-    readonly day: string;
-    readonly steps: number | null;
-    readonly totalSleepMinutes: number | null;
-    readonly restfulSleepMinutes: number | null;
-    readonly currentBpm: number | null;
-    readonly heartSamples: number[];
+interface HealthCache {
+    day: string;
+    steps: number | null;
+    totalSleepMinutes: number | null;
+    restfulSleepMinutes: number | null;
+    currentBpm: number | null;
+    heartSamples: number[];
 }
 
+const CACHE_KEY = "janktime2.health.snapshot.v1";
 const MAX_SAMPLES = 16;
-const HEALTH_CACHE_KEY = "janktime2.health.snapshot.v1";
-const MAX_CACHE_CHARS = 1024;
+
+function integer(value: unknown, minimum: number, maximum: number): number | null {
+    return typeof value === "number" && Number.isInteger(value) && value >= minimum && value <= maximum
+        ? value : null;
+}
+
+function dayKey(date: Date): string {
+    return String(date.getFullYear()) + "-" +
+        String(date.getMonth() + 1).padStart(2, "0") + "-" +
+        String(date.getDate()).padStart(2, "0");
+}
+
+function readCache(): HealthCache | null {
+    try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw || raw.length > 1024) return null;
+        const value = JSON.parse(raw) as Partial<HealthCache>;
+        if (typeof value.day !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value.day)) return null;
+        const samples = Array.isArray(value.heartSamples)
+            ? value.heartSamples.slice(0, MAX_SAMPLES).filter((n): n is number =>
+                typeof n === "number" && Number.isInteger(n) && n >= 20 && n <= 240)
+            : [];
+        return {
+            day: value.day,
+            steps: integer(value.steps, 0, 100000),
+            totalSleepMinutes: integer(value.totalSleepMinutes, 0, 1440),
+            restfulSleepMinutes: integer(value.restfulSleepMinutes, 0, 1440),
+            currentBpm: integer(value.currentBpm, 20, 240),
+            heartSamples: samples,
+        };
+    } catch {
+        return null;
+    }
+}
 
 function readMetric(id: number): number | null {
     try {
@@ -45,126 +77,67 @@ function readMetric(id: number): number | null {
     }
 }
 
-function validNullableInteger(value: unknown, minimum: number, maximum: number): number | null {
-    if (typeof value !== "number" || !Number.isSafeInteger(value) || value < minimum || value > maximum) {
-        return null;
-    }
-    return value;
-}
-
-function readPersistedHealth(): PersistedHealthSnapshot | null {
-    try {
-        const raw = localStorage.getItem(HEALTH_CACHE_KEY);
-        if (typeof raw !== "string" || raw.length === 0 || raw.length > MAX_CACHE_CHARS) return null;
-        const candidate: unknown = JSON.parse(raw);
-        if (typeof candidate !== "object" || candidate === null || Array.isArray(candidate)) return null;
-        const input = candidate as Record<string, unknown>;
-        const day = typeof input.day === "string" && /^\d{4}-\d{2}-\d{2}$/.test(input.day)
-            ? input.day : "";
-        if (day.length === 0) return null;
-        const heartSamples = Array.isArray(input.heartSamples)
-            ? input.heartSamples.slice(0, MAX_SAMPLES).filter((value): value is number =>
-                typeof value === "number" && Number.isInteger(value) && value >= 20 && value <= 240)
-            : [];
-        return {
-            day,
-            steps: validNullableInteger(input.steps, 0, 100_000),
-            totalSleepMinutes: validNullableInteger(input.totalSleepMinutes, 0, 1440),
-            restfulSleepMinutes: validNullableInteger(input.restfulSleepMinutes, 0, 1440),
-            currentBpm: validNullableInteger(input.currentBpm, 20, 240),
-            heartSamples,
-        };
-    } catch {
-        return null;
-    }
-}
-
-function persistHealth(snapshot: PersistedHealthSnapshot): void {
-    try {
-        const encoded = JSON.stringify(snapshot);
-        if (encoded.length <= MAX_CACHE_CHARS) localStorage.setItem(HEALTH_CACHE_KEY, encoded);
-    } catch {
-        // Storage may be unavailable; current-session rendering still works.
-    }
-}
-
-/**
- * Read Pebble Health once per display minute, retaining the last usable reading
- * on transient API gaps. Retained values are explicitly marked stale to the UI.
- */
 export function readHealthSnapshot(): NativeHealthSnapshot {
+    const today = dayKey(new Date());
+    const previous = readCache();
+    const cache: HealthCache = previous?.day === today ? previous : {
+        day: today,
+        steps: null,
+        totalSleepMinutes: previous?.totalSleepMinutes ?? null,
+        restfulSleepMinutes: previous?.restfulSleepMinutes ?? null,
+        currentBpm: previous?.currentBpm ?? null,
+        heartSamples: previous?.heartSamples ?? [],
+    };
     let freshSteps: number | null = null;
     let freshTotalSleep: number | null = null;
     let freshRestfulSleep: number | null = null;
-    let freshCurrentBpm: number | null = null;
-    let freshSamples: number[] = [];
+    let freshBpm: number | null = null;
+    const freshSamples: number[] = [];
 
     try {
         Natives.health_refresh();
         freshSteps = readMetric(0);
         freshTotalSleep = readMetric(1);
         freshRestfulSleep = readMetric(2);
-        freshCurrentBpm = readMetric(3);
-
-        const rawCount = Natives.health_sample_count();
-        const count = Number.isFinite(rawCount)
-            ? Math.max(0, Math.min(MAX_SAMPLES, Math.trunc(rawCount)))
-            : 0;
+        freshBpm = readMetric(3);
+        const count = Math.max(0, Math.min(MAX_SAMPLES, Math.trunc(Natives.health_sample_count())));
         for (let i = 0; i < count; i++) {
-            const value = Math.trunc(Natives.health_sample(i));
-            if (value >= 20 && value <= 240) freshSamples.push(value);
+            const bpm = Math.trunc(Natives.health_sample(i));
+            if (bpm >= 20 && bpm <= 240) freshSamples.push(bpm);
         }
     } catch {
-        // Use the persisted snapshot below, and mark the cached values stale.
+        // Keep the last-known-good values below and mark them stale.
     }
 
-    const now = new Date();
-    const today = String(now.getFullYear()) + "-" +
-        String(now.getMonth() + 1).padStart(2, "0") + "-" +
-        String(now.getDate()).padStart(2, "0");
-    const previous = readPersistedHealth();
-    const cache = previous?.day === today
-        ? previous
-        : {
-            day: today,
-            steps: null,
-            totalSleepMinutes: previous?.totalSleepMinutes ?? null,
-            restfulSleepMinutes: previous?.restfulSleepMinutes ?? null,
-            currentBpm: previous?.currentBpm ?? null,
-            heartSamples: previous?.heartSamples ?? [],
-        };
-
-    const steps = freshSteps ?? cache.steps;
-    const totalSleepMinutes = freshTotalSleep ?? cache.totalSleepMinutes;
-    const restfulSleepMinutes = freshRestfulSleep ?? cache.restfulSleepMinutes;
-    const currentBpm = freshCurrentBpm ?? freshSamples[freshSamples.length - 1] ?? cache.currentBpm;
-    const hasFreshGraph = freshSamples.length >= 2;
-    const heartSamples = hasFreshGraph ? freshSamples : cache.heartSamples;
-
-    const persisted: PersistedHealthSnapshot = {
+    const heartSamplesFresh = freshSamples.length >= 2;
+    const snapshot: HealthCache = {
         day: today,
-        steps,
-        totalSleepMinutes,
-        restfulSleepMinutes,
-        currentBpm,
-        heartSamples: heartSamples.slice(-MAX_SAMPLES),
+        steps: freshSteps ?? cache.steps,
+        totalSleepMinutes: freshTotalSleep ?? cache.totalSleepMinutes,
+        restfulSleepMinutes: freshRestfulSleep ?? cache.restfulSleepMinutes,
+        currentBpm: freshBpm ?? freshSamples[freshSamples.length - 1] ?? cache.currentBpm,
+        heartSamples: (heartSamplesFresh ? freshSamples : cache.heartSamples).slice(-MAX_SAMPLES),
     };
-    persistHealth(persisted);
+    try {
+        const encoded = JSON.stringify(snapshot);
+        if (encoded.length <= 1024) localStorage.setItem(CACHE_KEY, encoded);
+    } catch {
+        // Current-session values remain usable when persistent storage is unavailable.
+    }
 
     return {
-        ...persisted,
+        ...snapshot,
         stepsStale: freshSteps === null,
         totalSleepStale: freshTotalSleep === null,
         restfulSleepStale: freshRestfulSleep === null,
-        currentBpmStale: freshCurrentBpm === null && freshSamples.length === 0,
-        heartSamplesStale: !hasFreshGraph,
+        currentBpmStale: freshBpm === null && freshSamples.length === 0,
+        heartSamplesStale: !heartSamplesFresh,
     };
 }
 
 export function formatSteps(value: number | null): string {
     if (value === null || !Number.isFinite(value) || value < 0) return "--";
-    if (value >= 1000) return (Math.round(value / 100) / 10).toString() + "k";
-    return Math.trunc(value).toString();
+    return value >= 1000 ? (Math.round(value / 100) / 10).toString() + "k" : String(Math.trunc(value));
 }
 
 export function formatSleepMinutes(value: number | null): string {
