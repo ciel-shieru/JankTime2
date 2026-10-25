@@ -47,19 +47,33 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(workflow, /check_screenshot\.py/);
     const manifest = JSON.parse(read("../src/embeddedjs/manifest.json"));
     assert.deepEqual(manifest.resources, {});
+    assert.ok(manifest.modules["*"].includes("./mdi-icons"), "The MDI mask module must be included in the embedded watch build.");
     const renderer = read("../src/ts/watch/main.ts");
     assert.match(renderer, /new render\.Font\(bold \? "Gothic-Bold" : "Gothic-Regular", size\)/);
     assert.match(renderer, /systemFont\(14\)/);
     assert.match(renderer, /systemFont\(9\)/);
     assert.ok(renderer.includes('new render.Font("Leco-Bold", 36)'), "Clock must use the 36px Leco bold-numbers system font");
-    assert.match(renderer, /centered\(formatTime24\(lastDate\), clockFont, black, 100, 124\)/);
+    assert.match(renderer, /centered\(formatTime24\(lastDate\), clockFont, black, 100, 135\)/);
     assert.match(renderer, /drawBaseline\(String\(minimum\) \+ "\/" \+ String\(maximum\), smallFont, black, 168, 147\)/);
-    assert.match(renderer, /const mdiLightAlarm = \[/);
-    assert.match(renderer, /const mdiLightBluetooth = \[/);
-    assert.match(renderer, /drawMdiLightGlyph/);
-    assert.match(renderer, /MaterialDesignLight-SVG/);
-    assert.match(renderer, /fillRectangle\(color, left \+ start, top \+ y, x - start, 1\)/);
-    assert.match(renderer, /centered\(safe === null \? "--" : String\(safe\)/);
+    const mdi = read("../src/ts/watch/mdi-icons.ts");
+    assert.ok(mdi.includes("export const MDI_ICON_MASKS"));
+    const iconLines = mdi.split("\n").filter((line) => line.trim().startsWith('"'));
+    assert.equal(iconLines.length, 25);
+    assert.ok(iconLines.every((line) => line.split('"')[3]?.length === 64), "Each MDI glyph must be a bounded 16×16 mask");
+    assert.ok(renderer.includes("function drawMdiGlyph"));
+    assert.ok(renderer.includes("function weatherIcon"));
+    assert.ok(renderer.includes('case "focusCount": icon = "check-circle-outline"'));
+    assert.ok(renderer.includes('drawMdiGlyph(11, 141, heartColor, "heart", 14, 14)'));
+    assert.ok(renderer.includes('drawMdiGlyph(cx, cy, color, icon, 16, 16)'));
+    assert.ok(renderer.includes("drawBattery(143, 4, 26"));
+    assert.ok(renderer.includes("drawBattery(172, 4, 26"));
+    assert.ok(renderer.includes("drawBluetooth(136, statusCenterY"));
+    assert.ok(renderer.includes("const statusCenterY = 10"));
+    assert.ok(renderer.includes("planetTop = 62"));
+    assert.ok(renderer.includes('drawMetric("grid.bottom.1", 20, 72, 98, 36)'));
+    assert.ok(renderer.includes('centered(formatTime24(lastDate), clockFont, black, 100, 135)'));
+    assert.ok(renderer.includes('drawMetric("clock.left", 20, 108, 134, 36)'));
+    assert.match(renderer, /centeredAtY\(safe === null \? "--" : String\(safe\)/);
     const refreshSource = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/data/RefreshIntervals.kt");
     assert.match(refreshSource, /config\.genericSensorEntity/);
     assert.match(refreshSource, /updateHaMetric\("haSensor"\)/);
@@ -73,8 +87,34 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(companionBridge, /FailedDifferentAppOpen/);
     assert.match(companionBridge, /Open the JankTime2 watchface on the Pebble before refreshing/);
     assert.match(companionBridge, /FailedNoPermissions/);
+    const backupSource = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/config/ConfigBackup.kt");
+    assert.ok(backupSource.includes("schemaVersion"));
+    assert.ok(backupSource.includes("MAX_IMPORT_BYTES"));
+    assert.ok(backupSource.includes("imageRows"));
+    assert.ok(backupSource.includes("Image backup must be a 30×30 one-bit map."));
+    assert.ok(backupSource.includes("validateHttpsUrl"));
+    assert.ok(backupSource.includes("secrets: Map<String, String>?"));
+    assert.ok(companionScreen.includes("Export without secrets"));
+    assert.ok(companionScreen.includes("Danger: plaintext secrets"));
+    assert.ok(companionScreen.includes("Restore included secrets"));
+    assert.ok(companionScreen.includes("Import from file"));
+    assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_BASE64"));
+    assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD"));
+    assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD"));
+    assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_KEY_ALIAS"));
+    assert.ok(workflow.includes("base64 --decode"));
+    assert.ok(workflow.includes("name: screenshot_emery.png"));
+    assert.ok(workflow.includes("name: app-debug.apk"));
+    assert.ok(workflow.includes("path: artifacts/screenshot_emery.png"));
+    assert.ok(workflow.includes("path: release/janktime2-emery-production.pbw"));
+    assert.doesNotMatch(workflow, /echo\s+["']?\$ANDROID_DEBUG_KEYSTORE_(?:BASE64|STORE_PASSWORD|KEY_PASSWORD|KEY_ALIAS)\b/);
+    assert.doesNotMatch(workflow, /path: artifacts\/\s*$/m);
+    assert.doesNotMatch(workflow, /name: janktime2-emery-screenshot-and-logs/);
+    const gradleSigning = read("../companion/android/app/build.gradle.kts");
+    assert.ok(gradleSigning.includes('create("ciDebug")'));
+    assert.ok(gradleSigning.includes('signingConfigs.getByName("ciDebug")'));
     assert.doesNotMatch(renderer, /String\(safe\) \+ "%"/);
-    assert.match(renderer, /const bluetoothConnected = watch\.connected\.app/);
+    assert.match(renderer, /watch\.connected\.app \? blue : red/);
     assert.match(renderer, /baselineY - font\.height/);
     const configSource = read("../src/ts/watch/config.ts");
     assert.match(configSource, /PREVIEW_MODE = false/);
@@ -126,6 +166,7 @@ test("all accepted architecture decisions are present", () => {
         "../docs/adr/ADR-0014-android-calendar-provider.md",
         "../docs/adr/ADR-0015-image-and-epaper-rendering.md",
         "../docs/adr/ADR-0016-font-resource-and-blank-screen-regression.md",
+        "../docs/adr/ADR-0017-configuration-backup-and-secret-disclosure.md",
     ]) {
         assert.ok(existsSync(new URL(path, import.meta.url)), "Missing ADR: " + path);
     }

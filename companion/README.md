@@ -14,6 +14,7 @@ The Pebble mobile app's calendar-to-Timeline feature is still useful to the user
 - Pair with Wakey-SITizen's opt-in read-only export ContentProvider.
 - Cache validated last-known-good snapshots and include a stale flag/source timestamp in display payloads.
 - Resize/crop uploaded images on the phone to the exact measured native image-cell bounds before BLE transfer.
+- Import/export a bounded JSON backup of provider URLs and entities, PromQL, metric assignments, refresh intervals, calendar selections, and the 30×30 one-bit image. Secrets are excluded by default. The export dialog requires separate confirmation before writing credentials as plaintext JSON; imported credentials are written back to Android Keystore-backed encrypted storage.
 
 ## Required implementation stack
 
@@ -47,3 +48,8 @@ All native APIs and inter-app contracts must be checked against current Android 
 The companion uses PebbleKit Android 2's bound-service API, with auto-selection disabled and an explicit user-selected eligible phone app. Gravel (`com.anopticlabs.gravel`) is an intended candidate: it is surfaced only if its installed build advertises the compatible PebbleKit Android 2 service and appears in the library's eligible-app picker. Package visibility is declared explicitly for Gravel. Do not bypass the picker or trust an app solely because its package name matches.
 
 Gadgetbridge can connect to and manage Pebble watches, but its current external Pebble interface is not a PebbleKit Android 2 bound-service endpoint for sending arbitrary AppMessage dictionaries to a running watchface. The upstream Gadgetbridge Pebble receiver handles a narrow notification broadcast (`PEBBLE_ALERT`), not generic watchface AppMessage transport. JankTime2 therefore does not claim Gadgetbridge transport compatibility yet; implementing it requires a reviewed, supported Gadgetbridge-side AppMessage bridge or an upstream API, plus transport-specific tests. Do not silently send the current PebbleKit2 API to Gadgetbridge or fall back to unprotected implicit broadcasts for private display data.
+
+
+## Configuration backup security
+
+The default JSON export contains configuration and the optional 30×30 one-bit image, but no credentials. Exporting secrets requires explicit confirmation and writes provider tokens / the Wakey pairing token as plaintext. Treat that file as a credential bundle: save it only to trusted storage, never share or upload it, and securely delete extra copies. Importing a file with secrets requires a separate decision to restore them; restored secrets are encrypted at rest with the Android Keystore key. Malformed, oversized, unknown-version, non-HTTPS endpoint, and invalid image data are rejected. Backup contents and secrets are never logged.

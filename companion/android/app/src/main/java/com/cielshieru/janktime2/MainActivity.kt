@@ -2,6 +2,7 @@ package com.cielshieru.janktime2
 
 import android.Manifest
 import android.content.pm.PackageManager
+import java.io.ByteArrayOutputStream
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.work.ExistingWorkPolicy
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
@@ -26,6 +28,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,6 +44,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.cielshieru.janktime2.config.CompanionConfig
+import com.cielshieru.janktime2.config.ConfigBackup
+import com.cielshieru.janktime2.config.ConfigBackupCodec
 import com.cielshieru.janktime2.config.ConfigStore
 import com.cielshieru.janktime2.config.RegexFilter
 import com.cielshieru.janktime2.config.RefreshIntervals
@@ -98,6 +103,34 @@ class MainActivity : ComponentActivity() {
                                 PebbleBridge(applicationContext).use { it.sendImageRows(rows) }
                             }
                         },
+                        onGetImageRows = { withContext(Dispatchers.IO) { imageStore.loadRows() } },
+                        onGetSavedSecret = { key -> withContext(Dispatchers.IO) { secrets.get(key) } },
+                        onApplyImportedConfig = { backup, restoreSecrets ->
+                            var deliveryWarning: String? = null
+                            ConfigStore.save(applicationContext, backup.config)
+                            if (backup.imageRows != null) {
+                                val rowsFromBackup = backup.imageRows
+                                withContext(Dispatchers.IO) {
+                                    if (rowsFromBackup.isEmpty()) imageStore.clear()
+                                    else imageStore.restoreRows(rowsFromBackup)
+                                }
+                                val rowsToSend = rowsFromBackup.ifEmpty { List(30) { "0".repeat(30) } }
+                                runCatching {
+                                    withContext(Dispatchers.IO) {
+                                        PebbleBridge(applicationContext).use { it.sendImageRows(rowsToSend) }
+                                    }
+                                }.onFailure {
+                                    deliveryWarning = "The configuration and image were restored on the phone, but the image could not be delivered to the watch. Open the JankTime2 watchface and retry."
+                                }
+                            }
+                            if (restoreSecrets) {
+                                withContext(Dispatchers.IO) {
+                                    backup.secrets.orEmpty().forEach { (key, value) -> secrets.put(key, value) }
+                                }
+                            }
+                            RefreshScheduler(applicationContext).scheduleNext(1L, ExistingWorkPolicy.REPLACE)
+                            deliveryWarning
+                        },
                     )
                 }
             }
@@ -122,6 +155,9 @@ private fun CompanionSettingsScreen(
     onListPebbleApps: suspend () -> List<String>,
     onGetSelectedPebbleApp: suspend () -> String?,
     onChooseImage: suspend (android.net.Uri) -> Unit,
+    onGetImageRows: suspend () -> List<String>?,
+    onGetSavedSecret: suspend (String) -> String?,
+    onApplyImportedConfig: suspend (ConfigBackup, Boolean) -> String?,
 ) {
     val context = LocalContext.current
     var config by remember { mutableStateOf(initial) }
@@ -131,12 +167,111 @@ private fun CompanionSettingsScreen(
     var pebbleApps by remember { mutableStateOf(emptyList<String>()) }
     var selectedPebblePackage by remember { mutableStateOf<String?>(null) }
     var slotMenu by remember { mutableStateOf<String?>(null) }
+    var showExportDialog by remember { mutableStateOf(false) }
+    var showPlaintextExportWarning by remember { mutableStateOf(false) }
+    var pendingExportIncludesSecrets by remember { mutableStateOf(false) }
+    var showImportSecretsDialog by remember { mutableStateOf(false) }
+    var pendingImportedBackup by remember { mutableStateOf<ConfigBackup?>(null) }
     val scope = rememberCoroutineScope()
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) scope.launch {
             runCatching { onChooseImage(uri) }
                 .onSuccess { notice = "Image resized to 30×30 and queued for transfer." }
                 .onFailure { notice = "Image import failed: " + (it.message ?: "invalid image") }
+        }
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                val exportedSecrets = if (pendingExportIncludesSecrets) {
+                    val entered = mapOf(
+                        "home_assistant" to secrets.homeAssistant,
+                        "prometheus" to secrets.prometheus,
+                        "mindwtr" to secrets.mindwtr,
+                        "wakey_pairing" to secrets.wakeyPairing,
+                    )
+                    buildMap {
+                        for (key in listOf("home_assistant", "prometheus", "mindwtr", "wakey_pairing")) {
+                            val typed = entered[key].orEmpty()
+                            val stored = if (typed.isBlank()) onGetSavedSecret(key).orEmpty() else typed
+                            if (stored.isNotEmpty()) put(key, stored)
+                        }
+                    }
+                } else null
+                val currentConfig = config
+                val imageRows = onGetImageRows()
+                val json = withContext(Dispatchers.IO) { ConfigBackupCodec.encode(currentConfig, exportedSecrets, imageRows) }
+                withContext(Dispatchers.IO) {
+                    val output = context.contentResolver.openOutputStream(uri, "wt")
+                        ?: throw IllegalStateException("The chosen file could not be opened.")
+                    output.use { it.write(json.toByteArray(Charsets.UTF_8)) }
+                }
+                notice = if (pendingExportIncludesSecrets) {
+                    "Export completed. This JSON contains plaintext secrets; protect it and delete unneeded copies."
+                } else {
+                    "Configuration exported without secrets."
+                }
+            } catch (_: Exception) {
+                notice = "Export failed. Check the destination and available storage; no credentials were logged."
+            } finally {
+                pendingExportIncludesSecrets = false
+            }
+        }
+    }
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                val raw = withContext(Dispatchers.IO) {
+                    val input = context.contentResolver.openInputStream(uri)
+                        ?: throw IllegalStateException("The selected file could not be opened.")
+                    input.use { stream ->
+                        val output = ByteArrayOutputStream()
+                        val buffer = ByteArray(4096)
+                        var total = 0
+                        while (true) {
+                            val count = stream.read(buffer)
+                            if (count < 0) break
+                            total += count
+                            require(total <= ConfigBackupCodec.MAX_IMPORT_BYTES) {
+                                "Configuration backup exceeds the 256 KiB limit."
+                            }
+                            output.write(buffer, 0, count)
+                        }
+                        String(output.toByteArray(), Charsets.UTF_8)
+                    }
+                }
+                val backup = withContext(Dispatchers.IO) { ConfigBackupCodec.decode(raw) }
+                if (backup.secrets != null) {
+                    pendingImportedBackup = backup
+                    showImportSecretsDialog = true
+                } else {
+                    val warning = onApplyImportedConfig(backup, false)
+                    config = backup.config
+                    secrets = SecretInputs()
+                    notice = warning ?: "Configuration restored. Existing encrypted secrets were left unchanged."
+                }
+            } catch (failure: Exception) {
+                notice = "Import failed: " + (failure.message ?: "invalid configuration backup").take(180)
+            }
+        }
+    }
+    val applyImportedBackup: (ConfigBackup, Boolean) -> Unit = { backup, restoreSecrets ->
+        scope.launch {
+            try {
+                val warning = onApplyImportedConfig(backup, restoreSecrets)
+                config = backup.config
+                secrets = SecretInputs()
+                pendingImportedBackup = null
+                showImportSecretsDialog = false
+                notice = warning ?: if (restoreSecrets) {
+                    "Configuration and included secrets restored. Secrets were re-encrypted in Android Keystore."
+                } else {
+                    "Configuration restored. Existing encrypted secrets were left unchanged."
+                }
+            } catch (_: Exception) {
+                notice = "Configuration restore failed. Existing configuration was not confirmed as restored."
+            }
         }
     }
 
@@ -165,6 +300,13 @@ private fun CompanionSettingsScreen(
             "Provider tokens are encrypted with an Android Keystore AES-GCM key. Leave a token field blank to keep its current value.",
             style = MaterialTheme.typography.bodySmall,
         )
+
+        Text("Configuration backup", style = MaterialTheme.typography.titleMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            OutlinedButton(onClick = { showExportDialog = true }, modifier = Modifier.weight(1f)) { Text("Export to file") }
+            OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json", "text/json")) }, modifier = Modifier.weight(1f)) { Text("Import from file") }
+        }
+        Text("Backups include URLs, entity IDs, queries, metric slots, refresh settings, and calendar selections. Secrets are excluded unless explicitly requested.", style = MaterialTheme.typography.bodySmall)
 
         Text("Pebble mobile app", style = MaterialTheme.typography.titleMedium)
         Text("Selected bridge: " + (selectedPebblePackage ?: "none"), style = MaterialTheme.typography.bodySmall)
@@ -343,6 +485,74 @@ private fun CompanionSettingsScreen(
         ) {
             Text("Refresh data now")
         }
+        if (showExportDialog) {
+                    AlertDialog(
+                        onDismissRequest = { showExportDialog = false },
+                        title = { Text("Export configuration") },
+                        text = {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text("The default backup excludes provider and pairing secrets. Configuration values may still reveal internal hostnames, entity IDs, and queries.")
+                                TextButton(onClick = {
+                                    showExportDialog = false
+                                    pendingExportIncludesSecrets = false
+                                    exportLauncher.launch("janktime2-config.json")
+                                }) { Text("Export without secrets") }
+                            }
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showExportDialog = false
+                                showPlaintextExportWarning = true
+                            }) { Text("Include secrets…") }
+                        },
+                        dismissButton = { TextButton(onClick = { showExportDialog = false }) { Text("Cancel") } },
+                    )
+                }
+                if (showPlaintextExportWarning) {
+                    AlertDialog(
+                        onDismissRequest = { showPlaintextExportWarning = false },
+                        title = { Text("Danger: plaintext secrets") },
+                        text = {
+                            Text("Provider access tokens and the Wakey pairing token will be written as unencrypted text in the JSON file. Anyone who can read, copy, sync, or back up that file can use the credentials. Export only to trusted storage, do not email or upload it, and securely delete extra copies. JankTime2 will not log the file contents.")
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                showPlaintextExportWarning = false
+                                pendingExportIncludesSecrets = true
+                                exportLauncher.launch("janktime2-config.json")
+                            }) { Text("Export plaintext secrets") }
+                        },
+                        dismissButton = { TextButton(onClick = { showPlaintextExportWarning = false }) { Text("Cancel") } },
+                    )
+                }
+                if (showImportSecretsDialog && pendingImportedBackup != null) {
+                    AlertDialog(
+                        onDismissRequest = {
+                            showImportSecretsDialog = false
+                            pendingImportedBackup = null
+                        },
+                        title = { Text("Backup contains plaintext secrets") },
+                        text = {
+                            Text("The selected JSON includes credentials in plaintext. Importing them will encrypt them in Android Keystore, but the source file remains plaintext until you securely delete it. You can also restore settings only and leave currently stored secrets unchanged.")
+                        },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                pendingImportedBackup?.let { applyImportedBackup(it, true) }
+                            }) { Text("Restore included secrets") }
+                        },
+                        dismissButton = {
+                            Row {
+                                TextButton(onClick = {
+                                    pendingImportedBackup?.let { applyImportedBackup(it, false) }
+                                }) { Text("Settings only") }
+                                TextButton(onClick = {
+                                    showImportSecretsDialog = false
+                                    pendingImportedBackup = null
+                                }) { Text("Cancel") }
+                            }
+                        },
+                    )
+                }
         if (notice.isNotBlank()) Text(notice, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(24.dp))
     }

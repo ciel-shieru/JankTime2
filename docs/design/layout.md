@@ -6,6 +6,7 @@
 - The supplied screenshot is the approved reference for hierarchy, grouping, relative placement, whitespace, dividers, icon scale, and typography. The native implementation must be redrawn on the device's 200×228 canvas and verified in the emulator; do not merely shrink the source image as a rendering strategy.
 - Standard foreground text and horizontal rules are black. Leave background pixels unpainted so the device's normal e-paper/backlight background tint is preserved. Designated icons keep their semantic accent color, including blue metric icons, yellow phone battery, and blue watch battery.
 - The screen is static except for clock ticks and changed data. There are no animations or second ticks.
+- Status-bar elements share one vertical center and a right-justified alarm/Bluetooth/battery cluster with consistent small gaps. Metric, status, and heart glyphs use pre-rasterized Material Design Icons masks rather than ad-hoc line art.
 
 ## Regions in top-to-bottom order
 

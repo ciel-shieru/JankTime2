@@ -8,7 +8,8 @@
             "./model",
             "./bridge",
             "./config",
-            "./health"
+            "./health",
+            "./mdi-icons"
         ]
     },
     "resources": {},

@@ -72,6 +72,13 @@ class PixelImageStore(private val context: Context) {
         }.getOrNull()
     }
 
+    fun restoreRows(rows: List<String>) {
+        require(rows.size == TARGET_SIZE && rows.all { row ->
+            row.length == TARGET_SIZE && row.all { it == '0' || it == '1' }
+        }) { "Image pixel map is invalid." }
+        saveRows(rows)
+    }
+
     fun clear() {
         context.deleteFile(IMAGE_FILE)
     }

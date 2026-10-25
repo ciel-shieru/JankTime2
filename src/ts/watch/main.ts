@@ -11,6 +11,7 @@ import {
 } from "./model";
 import { displayState, setBridgeRedraw } from "./bridge";
 import { PREVIEW_MODE } from "./config";
+import { MDI_ICON_MASKS, type MdiIconName } from "./mdi-icons";
 import { formatSleepMinutes, formatSteps, readHealthSnapshot, type NativeHealthSnapshot } from "./health";
 
 const render = new Poco(screen);
@@ -48,6 +49,12 @@ const heartSamples = [
 function centered(text: string, font: PocoFont, color: unknown, cx: number, baselineY: number): void {
     render.drawText(text, font, color, Math.floor(cx - render.getTextWidth(text, font) / 2), baselineY - font.height);
 }
+function centeredAtY(text: string, font: PocoFont, color: unknown, cx: number, centerY: number): void {
+    render.drawText(text, font, color, Math.floor(cx - render.getTextWidth(text, font) / 2), Math.floor(centerY - font.height / 2));
+}
+function drawTextCenteredAtY(text: string, font: PocoFont, color: unknown, x: number, centerY: number): void {
+    render.drawText(text, font, color, x, Math.floor(centerY - font.height / 2));
+}
 function drawBaseline(text: string, font: PocoFont, color: unknown, x: number, baselineY: number): void {
     render.drawText(text, font, color, x, baselineY - font.height);
 }
@@ -60,164 +67,94 @@ function line(x1: number, y1: number, x2: number, y2: number, color: unknown, th
 function circle(cx: number, cy: number, r: number, color: unknown): void {
     render.drawCircle(color, cx, cy, r, 0, 360);
 }
-function ring(cx: number, cy: number, r: number, color: unknown, inner = 2): void {
-    circle(cx, cy, r, color);
-    circle(cx, cy, r - inner, paper);
-}
 function labelDate(date: Date): string {
     const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
     const months = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
     return days[date.getDay()] + " " + months[date.getMonth()] + " " + date.getDate();
 }
-// Compact, one-pixel MDI Light-style raster icons for the 200×228 display.
-// Pixel rasters generated from the MDI Light SVG paths at 10px height.
-// Material Design Light is published by Pictogrammers under OFL-1.1.
-// Sources: https://github.com/Templarian/MaterialDesignLight-SVG/blob/master/svg/alarm.svg
-//          https://github.com/Templarian/MaterialDesignLight-SVG/blob/master/svg/bluetooth.svg
-const mdiLightAlarm = [
-    ".##....##.",
-    "##########",
-    ".##....##.",
-    ".#..##..#.",
-    "#...##...#",
-    "#....#...#",
-    "#.....#..#",
-    ".#......#.",
-    ".##....##.",
-    "..######..",
-] as const;
-const mdiLightBluetooth = [
-    "...#..",
-    "...##.",
-    "#....#",
-    ".####.",
-    "..##..",
-    "..##..",
-    ".####.",
-    "#....#",
-    "...##.",
-    "...#..",
-] as const;
-
-function drawMdiLightGlyph(cx: number, cy: number, color: unknown, rows: readonly string[]): void {
-    const width = rows[0]?.length ?? 0;
-    const left = cx - Math.floor(width / 2);
-    const top = cy - Math.floor(rows.length / 2);
-    for (let y = 0; y < rows.length; y++) {
-        const row = rows[y] ?? "";
-        let x = 0;
-        while (x < width) {
-            if (row[x] !== "#") {
-                x++;
+function drawMdiGlyph(
+    cx: number,
+    cy: number,
+    color: unknown,
+    name: MdiIconName,
+    width = 16,
+    height = 16,
+): void {
+    const mask = MDI_ICON_MASKS[name];
+    if (mask === undefined || mask.length !== 64 || width < 1 || height < 1) return;
+    const left = Math.floor(cx - width / 2);
+    const top = Math.floor(cy - height / 2);
+    for (let dy = 0; dy < height; dy++) {
+        const sourceY = Math.min(15, Math.floor(dy * 16 / height));
+        const rowMask = Number.parseInt(mask.slice(sourceY * 4, sourceY * 4 + 4), 16);
+        let dx = 0;
+        while (dx < width) {
+            const sourceX = Math.min(15, Math.floor(dx * 16 / width));
+            if (((rowMask >> sourceX) & 1) === 0) {
+                dx++;
                 continue;
             }
-            const start = x;
-            while (x < width && row[x] === "#") x++;
-            render.fillRectangle(color, left + start, top + y, x - start, 1);
+            const start = dx;
+            while (dx < width) {
+                const currentSourceX = Math.min(15, Math.floor(dx * 16 / width));
+                if (((rowMask >> currentSourceX) & 1) === 0) break;
+                dx++;
+            }
+            render.fillRectangle(color, left + start, top + dy, dx - start, 1);
         }
     }
 }
+
+function weatherIcon(condition: string | null): MdiIconName {
+    const value = (condition ?? "").toLowerCase();
+    if (value === "" || value === "unknown" || value === "unavailable" || value === "none") return "help-circle-outline";
+    if (value.includes("lightning") || value.includes("thunder")) return "weather-lightning";
+    if (value.includes("snow") || value.includes("hail")) return "weather-snowy";
+    if (value.includes("rain") || value.includes("pour")) return "weather-rainy";
+    if (value.includes("fog") || value.includes("mist")) return "weather-fog";
+    if (value.includes("wind")) return "weather-windy";
+    if (value === "clear-night" || value === "night") return "weather-night";
+    if (value === "sunny" || value === "clear") return "weather-sunny";
+    if (value.includes("partlycloudy") || value.includes("partly-cloudy")) return "weather-partly-cloudy";
+    if (value.includes("cloud") || value.includes("overcast")) return "weather-cloudy";
+    return "help-circle-outline";
+}
+
 function drawAlarm(cx: number, cy: number, color: unknown): void {
-    drawMdiLightGlyph(cx, cy, color, mdiLightAlarm);
+    drawMdiGlyph(cx, cy, color, "alarm", 10, 10);
 }
 function drawBluetooth(cx: number, cy: number, color: unknown): void {
-    drawMdiLightGlyph(cx, cy, color, mdiLightBluetooth);
+    drawMdiGlyph(cx, cy, color, "bluetooth", 8, 10);
 }
 function drawBattery(x: number, y: number, width: number, percent: number | null, color: unknown): void {
-    render.frameRoundRect(x, y, width - 3, 12, color, 1);
-    render.drawRoundRect(x + width - 3, y + 3, 3, 6, color, 1);
+    const height = 12;
+    drawMdiGlyph(x + Math.floor(width / 2), y + Math.floor(height / 2), color, "battery-horizontal", width, height);
     const safe = percent === null ? null : Math.max(0, Math.min(100, Math.trunc(percent)));
-    centered(safe === null ? "--" : String(safe), smallFont, black, x + Math.floor((width - 3) / 2), y + 10);
+    centeredAtY(safe === null ? "--" : String(safe), smallFont, black, x + Math.floor(width / 2), y + Math.floor(height / 2));
 }
 function drawMetricIcon(metric: MetricId, cx: number, cy: number, stale: boolean): void {
     const color = stale ? red : blue;
+    let icon: MdiIconName;
     switch (metric) {
-        case "focusCount":
-            ring(cx, cy, 8, color, 2);
-            line(cx - 4, cy, cx - 1, cy + 3, color, 2);
-            line(cx - 1, cy + 3, cx + 5, cy - 4, color, 2);
-            break;
-        case "steps":
-            circle(cx - 4, cy + 3, 3, color); circle(cx + 5, cy - 4, 3, color);
-            circle(cx - 7, cy - 3, 1, color); circle(cx - 5, cy - 5, 1, color);
-            circle(cx + 2, cy + 1, 1, color); circle(cx + 4, cy - 8, 1, color);
-            break;
-        case "totalSleep":
-            circle(cx, cy, 8, color); circle(cx + 4, cy - 3, 7, paper);
-            circle(cx - 4, cy - 4, 1, color); circle(cx + 5, cy + 6, 1, color);
-            break;
-        case "restfulSleep":
-            line(cx - 9, cy + 4, cx + 9, cy + 4, color, 2);
-            line(cx - 8, cy - 3, cx - 8, cy + 7, color, 2);
-            line(cx + 8, cy, cx + 8, cy + 7, color, 2);
-            render.drawRoundRect(cx - 6, cy - 5, 6, 6, color, 1);
-            render.drawRoundRect(cx + 1, cy - 5, 7, 5, color, 1);
-            break;
-        case "fanState":
-            render.drawRoundRect(cx - 3, cy - 9, 6, 8, color, 2);
-            render.drawRoundRect(cx + 1, cy - 2, 8, 5, color, 2);
-            render.drawRoundRect(cx - 3, cy + 1, 6, 8, color, 2);
-            render.drawRoundRect(cx - 9, cy - 2, 8, 5, color, 2);
-            circle(cx, cy, 2, color);
-            break;
-        case "cpuUsage":
-            render.drawRoundRect(cx - 6, cy - 6, 12, 12, color, 1);
-            render.fillRectangle(paper, cx - 3, cy - 3, 6, 6);
-            for (let i = -1; i <= 1; i++) {
-                line(cx + i * 4, cy - 9, cx + i * 4, cy - 6, color);
-                line(cx + i * 4, cy + 6, cx + i * 4, cy + 9, color);
-                line(cx - 9, cy + i * 4, cx - 6, cy + i * 4, color);
-                line(cx + 6, cy + i * 4, cx + 9, cy + i * 4, color);
-            }
-            break;
-        case "memoryUsage":
-            render.frameRoundRect(cx - 9, cy - 5, 18, 10, color, 1);
-            render.fillRectangle(color, cx - 6, cy - 2, 3, 4);
-            render.fillRectangle(color, cx - 1, cy - 2, 3, 4);
-            render.fillRectangle(color, cx + 4, cy - 2, 3, 4);
-            line(cx - 7, cy + 5, cx - 7, cy + 8, color);
-            line(cx - 2, cy + 5, cx - 2, cy + 8, color);
-            line(cx + 3, cy + 5, cx + 3, cy + 8, color);
-            line(cx + 7, cy + 5, cx + 7, cy + 8, color);
-            break;
-        case "weatherFeelsLike":
-            drawWeatherCondition(cx, cy, color, displayState.weatherCondition);
-            break;
-        case "rainChance":
-            drawWeatherCondition(cx, cy, color, displayState.weatherCondition);
-            line(cx - 4, cy + 7, cx - 6, cy + 10, color, 2);
-            line(cx + 3, cy + 7, cx + 1, cy + 10, color, 2);
-            line(cx + 8, cy + 7, cx + 6, cy + 10, color, 2);
-            break;
-        case "alertCount":
-            line(cx - 7, cy + 5, cx - 5, cy + 2, color, 2);
-            line(cx - 5, cy + 2, cx - 4, cy - 5, color, 2);
-            line(cx - 4, cy - 5, cx, cy - 8, color, 2);
-            line(cx, cy - 8, cx + 4, cy - 5, color, 2);
-            line(cx + 4, cy - 5, cx + 5, cy + 2, color, 2);
-            line(cx + 5, cy + 2, cx + 7, cy + 5, color, 2);
-            line(cx - 7, cy + 5, cx + 7, cy + 5, color, 2);
-            circle(cx, cy + 7, 2, color); circle(cx, cy - 10, 1, color);
-            break;
-        case "water":
-            line(cx, cy - 9, cx - 6, cy + 1, color, 2);
-            line(cx - 6, cy + 1, cx - 6, cy + 4, color, 2);
-            line(cx - 6, cy + 4, cx - 3, cy + 8, color, 2);
-            line(cx - 3, cy + 8, cx + 3, cy + 8, color, 2);
-            line(cx + 3, cy + 8, cx + 6, cy + 4, color, 2);
-            line(cx + 6, cy + 4, cx + 6, cy + 1, color, 2);
-            line(cx + 6, cy + 1, cx, cy - 9, color, 2);
-            break;
-        case "haSensor":
-        case "haClimateValue":
-            ring(cx, cy, 7, color, 2);
-            line(cx, cy, cx + 4, cy - 3, color, 2);
-            circle(cx, cy, 2, color);
-            break;
-        case "none":
-            break;
+        case "focusCount": icon = "check-circle-outline"; break;
+        case "steps": icon = "shoe-print"; break;
+        case "totalSleep": icon = "moon-waning-crescent"; break;
+        case "restfulSleep": icon = "bed-outline"; break;
+        case "fanState": icon = "fan"; break;
+        case "cpuUsage": icon = "cpu-64-bit"; break;
+        case "memoryUsage": icon = "memory"; break;
+        case "weatherFeelsLike": icon = weatherIcon(displayState.weatherCondition); break;
+        case "rainChance": icon = "weather-rainy"; break;
+        case "alertCount": icon = "bell-alert-outline"; break;
+        case "water": icon = "water-percent"; break;
+        case "haSensor": icon = "gauge"; break;
+        case "haClimateValue": icon = "thermometer"; break;
+        case "none": return;
+        default: icon = "help-circle-outline"; break;
     }
+    drawMdiGlyph(cx, cy, color, icon, 16, 16);
 }
+
 let nativeHealth: NativeHealthSnapshot = {
     steps: null,
     totalSleepMinutes: null,
@@ -261,83 +198,28 @@ function drawMetric(slot: SlotId, cx: number, iconY: number, valueY: number, max
     centered(clipped(value, valueFont, maxWidth), valueFont, black, cx, valueY);
 }
 function drawPlanet(): void {
+    const planetTop = 62;
     const rows = displayState.imageRows;
     if (rows !== null && rows.length === 30 && rows.every((row) => /^[01]{30}$/.test(row))) {
         for (let y = 0; y < 30; y++) {
             const row = rows[y] ?? "";
             for (let x = 0; x < 30; x++) {
-                if (row[x] === "1") render.fillRectangle(black, 85 + x, 58 + y, 1, 1);
+                if (row[x] === "1") render.fillRectangle(black, 85 + x, planetTop + y, 1, 1);
             }
         }
         return;
     }
 
-    render.frameRoundRect(85, 58, 30, 30, blue, 1);
+    render.frameRoundRect(85, planetTop, 30, 30, blue, 1);
     if (!PREVIEW_MODE) return;
-    circle(92, 66, 1, blue); circle(109, 64, 1, blue);
-    circle(110, 81, 1, blue); circle(92, 83, 1, blue);
-    circle(100, 73, 7, blue);
-    line(88, 80, 95, 74, blue, 2);
-    line(104, 71, 112, 65, blue, 2);
-    line(90, 71, 98, 76, paper, 2);
-    line(98, 68, 103, 73, paper, 2);
-    line(101, 71, 106, 76, paper, 2);
-}
-
-function drawWeatherCondition(cx: number, cy: number, color: unknown, condition: string | null): void {
-    const value = (condition ?? "").toLowerCase();
-    const unknown = value === "" || value === "unknown" || value === "unavailable" || value === "none";
-    if (unknown) {
-        render.drawText("?", smallFont, color, cx - 3, cy - 7);
-        return;
-    }
-    const clearNight = value === "clear-night";
-    const sunny = value === "sunny" || (value === "clear" && !clearNight);
-    const partlyCloudy = value === "partlycloudy" || value === "partly-cloudy";
-    const cloudy = partlyCloudy || value.includes("cloud") || value.includes("overcast");
-    const rainy = value.includes("rain") || value.includes("pour");
-    const snowy = value.includes("snow") || value.includes("hail");
-    const foggy = value.includes("fog") || value.includes("mist");
-    const stormy = value.includes("lightning") || value.includes("thunder");
-    const windy = value.includes("windy");
-    if (sunny || clearNight || partlyCloudy) {
-        circle(cx - 3, cy - 4, 4, color);
-        line(cx - 3, cy - 11, cx - 3, cy - 9, color);
-        line(cx - 10, cy - 4, cx - 8, cy - 4, color);
-        line(cx + 2, cy - 9, cx + 3, cy - 8, color);
-        if (clearNight) {
-            circle(cx - 1, cy - 4, 3, black);
-            circle(cx + 1, cy - 5, 3, paper);
-        }
-    }
-    if (cloudy || rainy || snowy || foggy || stormy || windy) {
-        circle(cx + 1, cy + 1, 5, black);
-        circle(cx + 7, cy, 4, black);
-        render.drawRoundRect(cx - 4, cy, 15, 6, black, 2);
-        circle(cx + 1, cy + 1, 3, paper);
-        circle(cx + 7, cy, 2, paper);
-        render.drawRoundRect(cx - 2, cy + 1, 10, 4, paper, 1);
-    }
-    if (rainy) {
-        line(cx - 3, cy + 7, cx - 5, cy + 10, color, 2);
-        line(cx + 3, cy + 7, cx + 1, cy + 10, color, 2);
-        line(cx + 8, cy + 7, cx + 6, cy + 10, color, 2);
-    } else if (snowy) {
-        line(cx - 3, cy + 7, cx - 3, cy + 10, color, 1);
-        line(cx - 5, cy + 8, cx - 1, cy + 8, color, 1);
-        line(cx + 5, cy + 7, cx + 5, cy + 10, color, 1);
-        line(cx + 3, cy + 8, cx + 7, cy + 8, color, 1);
-    } else if (foggy) {
-        line(cx - 6, cy + 7, cx + 8, cy + 7, color, 1);
-        line(cx - 5, cy + 10, cx + 7, cy + 10, color, 1);
-    } else if (stormy) {
-        line(cx + 2, cy + 5, cx - 1, cy + 9, yellow, 2);
-        line(cx - 1, cy + 9, cx + 2, cy + 9, yellow, 2);
-        line(cx + 2, cy + 9, cx, cy + 12, yellow, 2);
-    } else if (windy) {
-        line(cx - 5, cy + 7, cx + 8, cy + 7, color, 1);
-        line(cx - 3, cy + 10, cx + 5, cy + 10, color, 1);
-    }
+    circle(92, planetTop + 8, 1, blue); circle(109, planetTop + 6, 1, blue);
+    circle(110, planetTop + 23, 1, blue); circle(92, planetTop + 25, 1, blue);
+    circle(100, planetTop + 15, 7, blue);
+    line(88, planetTop + 22, 95, planetTop + 16, blue, 2);
+    line(104, planetTop + 13, 112, planetTop + 7, blue, 2);
+    line(90, planetTop + 13, 98, planetTop + 18, paper, 2);
+    line(98, planetTop + 10, 103, planetTop + 15, paper, 2);
+    line(101, planetTop + 13, 106, planetTop + 18, paper, 2);
 }
 
 function drawHeartRate(): void {
@@ -346,8 +228,7 @@ function drawHeartRate(): void {
     const heartFresh = PREVIEW_MODE || !nativeHealth.currentBpmStale;
     const graphFresh = PREVIEW_MODE || !nativeHealth.heartSamplesStale;
     const heartColor = heartFresh ? blue : red;
-    circle(8, 140, 4, heartColor); circle(14, 140, 4, heartColor);
-    line(4, 141, 11, 149, heartColor, 2); line(18, 141, 11, 149, heartColor, 2);
+    drawMdiGlyph(11, 141, heartColor, "heart", 14, 14);
     drawBaseline(bpm === null ? "--" : String(bpm), valueFont, black, 22, 149);
 
     if (samples.length >= 2) {
@@ -390,25 +271,26 @@ function drawRows(): void {
     drawBaseline(clipped(events[1] ?? "", smallFont, 190), smallFont, black, 6, 221);
 }
 function drawStatus(date: Date): void {
-    drawBaseline(labelDate(date), statusFont, black, 5, 15);
+    const statusCenterY = 10;
+    const dateText = labelDate(date);
+    centeredAtY(dateText, statusFont, black, 5 + render.getTextWidth(dateText, statusFont) / 2, statusCenterY);
     const previewAlarm = PREVIEW_MODE ? formatTime24(previewAlarmAt) : null;
-    const alarmTime = displayState.alarmTime ?? previewAlarm;
+    const alarmTime = displayState.alarmTime ?? previewAlarm ?? "--:--";
     const bedtime = displayState.alarmTime !== null
         ? displayState.alarmIsBedtime
         : PREVIEW_MODE && previewBedtimeAt !== null && previewBedtimeAt.getTime() < previewAlarmAt.getTime();
-    if (bedtime) {
-        circle(62, 9, 6, blue);
-        circle(65, 6, 5, paper);
-    } else {
-        drawAlarm(62, 9, alarmTime === null ? red : black);
-    }
-    drawBaseline(alarmTime ?? "--:--", statusFont, black, 71, 15);
+    const timeRight = 129;
+    const timeLeft = timeRight - render.getTextWidth(alarmTime, statusFont);
+    const alarmColor = alarmTime === "--:--" ? red : black;
+    if (bedtime) drawMdiGlyph(timeLeft - 8, statusCenterY, blue, "moon-waning-crescent", 10, 10);
+    else drawAlarm(timeLeft - 8, statusCenterY, alarmColor);
+    drawTextCenteredAtY(alarmTime, statusFont, black, timeLeft, statusCenterY);
+
     // The PebbleKit connection is the authoritative live phone/watch connection state.
-    // Do not mark it red merely because an optional phone-status payload is absent.
-    const bluetoothConnected = watch.connected.app;
-    drawBluetooth(111, 10, bluetoothConnected ? blue : red);
-    drawBattery(134, 4, 27, displayState.phoneBatteryPercent ?? (PREVIEW_MODE ? previewPhoneBatteryPercent : null), yellow);
-    drawBattery(170, 4, 27, watchBatteryPercent, blue);
+    // Keep a narrow, consistent 3px gap across the right-justified status cluster.
+    drawBluetooth(136, statusCenterY, watch.connected.app ? blue : red);
+    drawBattery(143, 4, 26, displayState.phoneBatteryPercent ?? (PREVIEW_MODE ? previewPhoneBatteryPercent : null), yellow);
+    drawBattery(172, 4, 26, watchBatteryPercent, blue);
     line(5, 20, 195, 20, black);
 }
 function draw(event?: AlloyWatchMinuteEvent): void {
@@ -424,15 +306,15 @@ function draw(event?: AlloyWatchMinuteEvent): void {
     ] as const;
     for (const [slot, x] of rowOne) drawMetric(slot, x, 34, 58, 36);
 
-    drawMetric("grid.bottom.1", 20, 68, 94, 36);
-    drawMetric("grid.bottom.2", 60, 68, 94, 36);
+    drawMetric("grid.bottom.1", 20, 72, 98, 36);
+    drawMetric("grid.bottom.2", 60, 72, 98, 36);
     drawPlanet();
-    drawMetric("grid.bottom.4", 140, 68, 94, 36);
-    drawMetric("grid.bottom.5", 180, 68, 94, 36);
+    drawMetric("grid.bottom.4", 140, 72, 98, 36);
+    drawMetric("grid.bottom.5", 180, 72, 98, 36);
 
-    centered(formatTime24(lastDate), clockFont, black, 100, 124);
-    drawMetric("clock.left", 20, 123, 142, 36);
-    drawMetric("clock.right", 180, 123, 142, 36);
+    centered(formatTime24(lastDate), clockFont, black, 100, 135);
+    drawMetric("clock.left", 20, 108, 134, 36);
+    drawMetric("clock.right", 180, 108, 134, 36);
     drawHeartRate();
     drawRows();
     render.end();

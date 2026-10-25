@@ -117,8 +117,16 @@ jobs:
       - name: Upload production Pebble watchface (.pbw)
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: janktime2-emery-pbw
-          path: release/
+          name: janktime2-emery-production.pbw
+          path: release/janktime2-emery-production.pbw
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload production watchface SHA-256 checksum
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: janktime2-emery-production.pbw.sha256
+          path: release/janktime2-emery-production.pbw.sha256
           if-no-files-found: error
           retention-days: 30
 
@@ -152,12 +160,39 @@ jobs:
           pebble sdk list > artifacts/pebble-sdk-list.txt 2>&1 || true
           pebble --version > artifacts/pebble-tool-version.txt 2>&1 || true
 
-      - name: Upload screenshot and diagnostics
+      - name: Upload emulator screenshot
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: janktime2-emery-screenshot-and-logs
-          path: artifacts/
+          name: screenshot_emery.png
+          path: artifacts/screenshot_emery.png
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload emulator startup log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pebble-logs.txt
+          path: artifacts/pebble-logs.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Pebble SDK diagnostics
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pebble-sdk-list.txt
+          path: artifacts/pebble-sdk-list.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload Pebble tool version
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: pebble-tool-version.txt
+          path: artifacts/pebble-tool-version.txt
           if-no-files-found: warn
           retention-days: 14
 
@@ -197,8 +232,32 @@ jobs:
             --root "$ANDROID_HOME/build-tools/36.0.0" \
             --verify tooling/android-build-tools-36.0.0.json
 
+      - name: Configure private CI debug keystore
+        shell: bash
+        env:
+          ANDROID_DEBUG_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_BASE64 }}
+          ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD: ${{ secrets.ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD }}
+          ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD: ${{ secrets.ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD }}
+          ANDROID_DEBUG_KEYSTORE_KEY_ALIAS: ${{ secrets.ANDROID_DEBUG_KEYSTORE_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_DEBUG_KEYSTORE_BASE64:-}" || -z "${ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD:-}" || -z "${ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD:-}" || -z "${ANDROID_DEBUG_KEYSTORE_KEY_ALIAS:-}" ]]; then
+            echo "Required CI debug-keystore secrets are missing." >&2
+            exit 1
+          fi
+          umask 077
+          install -d -m 0700 "$HOME/.android"
+          printf '%s' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode 2>/dev/null > "$HOME/.android/debug.keystore"
+          test -s "$HOME/.android/debug.keystore"
+          chmod 0600 "$HOME/.android/debug.keystore"
+          echo "ANDROID_DEBUG_KEYSTORE_PATH=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
+
       - name: Verify Android dependency pins and enforce Gradle checksums
         shell: bash
+        env:
+          ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD: ${{ secrets.ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD }}
+          ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD: ${{ secrets.ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD }}
+          ANDROID_DEBUG_KEYSTORE_KEY_ALIAS: ${{ secrets.ANDROID_DEBUG_KEYSTORE_KEY_ALIAS }}
         run: |
           set -euo pipefail
           chmod +x companion/android/gradlew
@@ -220,8 +279,8 @@ jobs:
         if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: janktime2-android-companion-debug
-          path: companion/android/app/build/outputs/apk/debug/*.apk
+          name: app-debug.apk
+          path: companion/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
 

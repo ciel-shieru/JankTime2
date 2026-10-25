@@ -32,6 +32,28 @@ const ciPath = ".github/workflows/ci.yml";
 const ci = read(ciPath);
 const policy = read("docs/security/dependency-pinning.md");
 
+const requiredDebugSigningSecrets = [
+  "ANDROID_DEBUG_KEYSTORE_BASE64",
+  "ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD",
+  "ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD",
+  "ANDROID_DEBUG_KEYSTORE_KEY_ALIAS",
+];
+for (const secret of requiredDebugSigningSecrets) {
+  check(ci.includes(secret), "CI must consume the required debug-signing secret: " + secret);
+}
+check(ci.includes('printf \'%s\' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --decode') &&
+  ci.includes('"$HOME/.android/debug.keystore"') && ci.includes('ANDROID_DEBUG_KEYSTORE_PATH=$HOME/.android/debug.keystore'),
+  "CI must decode the configured debug keystore into ~/.android/debug.keystore without logging its contents.");
+check(!/echo\s+["']?\$ANDROID_DEBUG_KEYSTORE_(?:BASE64|STORE_PASSWORD|KEY_PASSWORD|KEY_ALIAS)\b/.test(ci),
+  "CI must never echo debug keystore secrets.");
+check(!/^\s*path:\s+artifacts\/\s*$/m.test(ci),
+  "CI must upload screenshot and diagnostic files individually, not as a directory bundle.");
+check(ci.includes("name: screenshot_emery.png") && ci.includes("path: artifacts/screenshot_emery.png") &&
+  ci.includes("name: app-debug.apk") &&
+  ci.includes("name: janktime2-emery-production.pbw") &&
+  ci.includes("path: release/janktime2-emery-production.pbw"),
+  "CI must upload individual output files using their real filenames as artifact names.");
+
 check(ci.includes("npm ci --ignore-scripts"), "CI must install npm dependencies using npm ci with lifecycle scripts disabled.");
 check(ci.includes("--require-hashes"), "CI must install Python dependencies using pip --require-hashes.");
 check(ci.includes("--write-verification-metadata sha256") && ci.includes("--write-locks"),

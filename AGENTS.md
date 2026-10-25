@@ -38,8 +38,8 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 - Keep the composition in docs/design/layout.md: top status bar; two five-column metric rows with the center cell of the second row reserved for the image; large centered 24-hour HH:mm clock; one metric on either side of the clock; heart-rate graph; two focus rows; two calendar rows.
 - There are eleven configurable metric slots. The image cell is not a metric slot. Keep each slot individually configurable.
 - Time always uses 24-hour HH:mm with a leading zero. No seconds.
-- Phone battery is the yellow battery and watch battery is blue; place each percentage inside its horizontal battery outline.
-- Preserve the provided icon semantics and accent colors. Standard foreground text and dividers are black; unpainted background uses the device/system-default e-paper and backlight tint rather than filling the entire screen with a hard-coded color.
+- Phone battery is yellow and watch battery is blue; place each numeric level centered inside its narrow horizontal MDI battery outline without a percent sign.
+- Use Material Design Icons (MDI) consistently for all status, metric, weather, and heart glyphs. Preserve icon semantics and accent colors. Standard foreground text and dividers are black; unpainted background uses the device/system-default e-paper and backlight tint rather than filling the entire screen with a hard-coded color.
 - Text overflow in focus and calendar rows is abrupt clipping/truncation. Do not append ellipses.
 - The clock's left-side robot 3/5 metric is intentionally out of scope for the first implementation. Keep the slot configurable and permit none.
 
@@ -48,6 +48,8 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 - HTTPS only for remote endpoints. Never disable certificate validation or use trust-all TLS managers.
 - Keep Home Assistant, Prometheus, and Mindwtr credentials in Android Keystore-backed companion storage. Redact credentials, authorization headers, private entity state, and task titles from logs.
 - Do not put secrets in source, test fixtures, app messages, screenshot artifacts, build output, or GitHub Actions logs.
+- CI must inject the debug signing keystore via secret-backed environment variables, decode it to `~/.android/debug.keystore`, use it only for the debug build, and never print key material or passwords.
+- Configuration backups must exclude secrets by default. Before exporting credentials, show a plaintext-secret warning and require explicit confirmation; imports containing secrets also require an explicit choice. Restore imported secrets into Android Keystore-backed encrypted storage, bound JSON/image input sizes, and never log backup content.
 - Validate user-supplied URLs, entity IDs, PromQL, timeouts, response size, field types, calendar regex length, and all refresh intervals (1–60 minutes). Reject malformed input closed.
 - Do not follow cross-origin redirects with credentials. A provider response from an unexpected origin is an error.
 - Use least-privilege/read-only provider credentials wherever available. Make user-visible permission and data-source choices explicit.
@@ -80,5 +82,6 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 - Run Android unit tests, lint, and assembleDebug for companion changes.
 - CI must upload a **production-mode** .pbw artifact built before enabling preview fixtures. Do not distribute the fixture-enabled screenshot build. Keep the .pbw separate from screenshot/log artifacts.
 - CI screenshot artifacts are build evidence. Inspect them for clipping, overlap, missing resources, incorrect fonts, and layout drift.
+- Upload CI outputs one file per artifact, naming each artifact after the actual output filename; do not manually ZIP screenshot, log, APK, PBW, or checksum files. GitHub’s artifact service may still package downloads in its own wrapper archive.
 - The current renderer is a preview of the approved layout and uses fixture values until the providers/companion are implemented. Do not treat fixture data as live data or treat one passing screenshot smoke check as final visual acceptance.
 - The normal Alloy mdbl.c template may be changed only for documented runtime heap requirements; record heap sizing in an ADR and keep the total allocation within the emery app-RAM budget.

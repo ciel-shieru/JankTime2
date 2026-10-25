@@ -3,6 +3,13 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+// CI supplies a repository-owned debug key through environment variables. Local
+// development remains on Android Gradle Plugin's standard debug keystore.
+val ciDebugKeystorePath = providers.environmentVariable("ANDROID_DEBUG_KEYSTORE_PATH").orNull
+val ciDebugStorePassword = providers.environmentVariable("ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD").orNull
+val ciDebugKeyPassword = providers.environmentVariable("ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD").orNull
+val ciDebugKeyAlias = providers.environmentVariable("ANDROID_DEBUG_KEYSTORE_KEY_ALIAS").orNull
+
 android {
     namespace = "com.cielshieru.janktime2"
     compileSdk = 36
@@ -17,6 +24,18 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (ciDebugKeystorePath != null) {
+            create("ciDebug") {
+                storeFile = file(ciDebugKeystorePath)
+                storePassword = ciDebugStorePassword ?: error("CI debug keystore store password is missing.")
+                keyPassword = ciDebugKeyPassword ?: error("CI debug keystore key password is missing.")
+                keyAlias = ciDebugKeyAlias?.takeIf { it.isNotBlank() }
+                    ?: error("CI debug keystore alias is missing.")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -24,6 +43,7 @@ android {
         }
         debug {
             isMinifyEnabled = false
+            if (ciDebugKeystorePath != null) signingConfig = signingConfigs.getByName("ciDebug")
         }
     }
 
