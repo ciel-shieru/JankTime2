@@ -10,3 +10,5 @@ Accepted decisions are numbered and versioned. A changed decision requires a new
 - ADR-0006 — Pebble Health data and native C FFI boundary.
 - ADR-0007 — Mindwtr server API rather than private Android app storage.
 - ADR-0008 — CI, emulator screenshot artifact, and reproducible checks.
+
+- ADR-0009 — Pixel font and Poco renderer for the approved high-density layout.

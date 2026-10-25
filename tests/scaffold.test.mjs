@@ -18,6 +18,17 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(layout, /grid\.bottom\.3/);
     assert.match(layout, /ellipsis/i);
     assert.match(layout, /HH:mm/);
+    const model = read("../src/ts/watch/model.ts");
+    for (const slot of [
+        "grid.top.1", "grid.top.2", "grid.top.3", "grid.top.4", "grid.top.5",
+        "grid.bottom.1", "grid.bottom.2", "grid.bottom.4", "grid.bottom.5",
+        "clock.left", "clock.right",
+    ]) {
+        assert.ok(model.includes('"' + slot + '"'), "Missing configurable slot " + slot);
+    }
+    assert.match(model, /function validateSlotConfiguration/);
+    assert.match(model, /function selectAlarmOrBedtime/);
+    assert.match(model, /function clipByWidth/);
 });
 
 test("all accepted architecture decisions are present", () => {
@@ -30,6 +41,7 @@ test("all accepted architecture decisions are present", () => {
         "../docs/adr/ADR-0006-pebble-health-ffi.md",
         "../docs/adr/ADR-0007-mindwtr-server.md",
         "../docs/adr/ADR-0008-ci-and-screenshot.md",
+        "../docs/adr/ADR-0009-pixel-font-and-layout-renderer.md",
     ]) {
         assert.ok(existsSync(new URL(path, import.meta.url)), "Missing ADR: " + path);
     }

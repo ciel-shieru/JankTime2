@@ -1,8 +1,39 @@
 {
-  "include": [
-    "$(MODDABLE)/examples/manifest_mod.json"
-  ],
-  "modules": {
-    "*": "./main.js"
-  }
+    "include": [
+        "$(MODDABLE)/examples/manifest_mod.json"
+    ],
+    "modules": {
+        "*": [
+            "./main",
+            "./model"
+        ]
+    },
+    "resources": {
+        "*-alpha": [
+            {
+                "source": "./assets/Jersey10-Regular",
+                "size": 10,
+                "monochrome": true,
+                "blocks": ["Basic Latin"]
+            },
+            {
+                "source": "./assets/Jersey10-Regular",
+                "size": 12,
+                "monochrome": true,
+                "blocks": ["Basic Latin"]
+            },
+            {
+                "source": "./assets/Jersey10-Regular",
+                "size": 16,
+                "monochrome": true,
+                "blocks": ["Basic Latin", "Latin-1 Supplement"]
+            },
+            {
+                "source": "./assets/Jersey10-Regular",
+                "size": 42,
+                "monochrome": true,
+                "blocks": ["Basic Latin", "Latin-1 Supplement"]
+            }
+        ]
+    }
 }
