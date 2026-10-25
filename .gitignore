@@ -53,3 +53,24 @@ dkms.conf
 
 # debug information files
 *.dwo
+
+# Node/TypeScript
+node_modules/
+npm-debug.log*
+src/embeddedjs/*.js
+src/embeddedjs/**/*.js
+src/pkjs/*.js
+src/pkjs/**/*.js
+
+# Pebble SDK/build output
+build/
+artifacts/
+screenshots/
+pebble-logs.txt
+.pebble-logs.pid
+.DS_Store
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
