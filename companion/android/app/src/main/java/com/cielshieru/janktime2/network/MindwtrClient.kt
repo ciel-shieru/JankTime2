@@ -11,6 +11,24 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
+private fun parseMindwtrInstant(raw: String?): Instant? {
+    if (raw.isNullOrBlank()) return null
+    try { return Instant.parse(raw) } catch (_: DateTimeParseException) { }
+    try { return OffsetDateTime.parse(raw).toInstant() } catch (_: DateTimeParseException) { }
+    try { return LocalDateTime.parse(raw).atZone(ZoneId.systemDefault()).toInstant() } catch (_: DateTimeParseException) { }
+    try { return LocalDate.parse(raw).atStartOfDay(ZoneId.systemDefault()).toInstant() } catch (_: DateTimeParseException) { }
+    return null
+}
+
+private fun formatMindwtrTime(raw: String?): String {
+    val instant = parseMindwtrInstant(raw) ?: return "--:--"
+    return DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()).format(instant)
+}
+
+private fun cleanMindwtrText(value: String, maxChars: Int): String =
+    value.replace(Regex("[\\u0000-\\u001f\\u007f-\\u009f\\u202a-\\u202e\\u2066-\\u2069]"), "")
+        .take(maxChars)
+
 data class MindwtrTask(
     val id: String,
     val title: String,
@@ -30,10 +48,12 @@ data class MindwtrTask(
             "urgent" -> "!!!!"
             else -> ""
         }
-        return displayTime(startTime) + " | " + displayTime(dueDate) + " | " + marks + " | " + cleanText(title, 160)
+        return formatMindwtrTime(startTime) + " | " + formatMindwtrTime(dueDate) + " | " + marks + " | " + cleanMindwtrText(title, 160)
     }
 
-    fun sortKey(): Pair<Long, Long> = parseEpochMillis(startTime) to parseEpochMillis(dueDate)
+    fun sortKey(): Pair<Long, Long> =
+        (parseMindwtrInstant(startTime)?.toEpochMilli() ?: Long.MAX_VALUE) to
+            (parseMindwtrInstant(dueDate)?.toEpochMilli() ?: Long.MAX_VALUE)
 }
 
 data class MindwtrFocusResult(val remaining: Int, val total: Int, val rows: List<String>)
@@ -98,25 +118,5 @@ class MindwtrClient(context: Context) {
 
     companion object {
         private const val MAX_TASKS = 1000
-
-        fun displayTime(raw: String?): String {
-            if (raw.isNullOrBlank()) return "--:--"
-            val instant = parseInstant(raw) ?: return "--:--"
-            return DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()).format(instant)
-        }
-
-        fun parseEpochMillis(raw: String?): Long = parseInstant(raw)?.toEpochMilli() ?: Long.MAX_VALUE
-
-        private fun parseInstant(raw: String): Instant? {
-            try { return Instant.parse(raw) } catch (_: DateTimeParseException) { }
-            try { return OffsetDateTime.parse(raw).toInstant() } catch (_: DateTimeParseException) { }
-            try { return LocalDateTime.parse(raw).atZone(ZoneId.systemDefault()).toInstant() } catch (_: DateTimeParseException) { }
-            try { return LocalDate.parse(raw).atStartOfDay(ZoneId.systemDefault()).toInstant() } catch (_: DateTimeParseException) { }
-            return null
-        }
-
-        private fun cleanText(value: String, maxChars: Int): String =
-            value.replace(Regex("[\\u0000-\\u001f\\u007f-\\u009f\\u202a-\\u202e\\u2066-\\u2069]"), "")
-                .take(maxChars)
     }
 }
