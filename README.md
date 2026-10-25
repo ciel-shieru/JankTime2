@@ -150,7 +150,7 @@ pebble install --emulator emery
 pebble screenshot --no-open --emulator emery artifacts/screenshot_emery.png
 ~~~
 
-The GitHub Actions workflow performs these checks on pull requests and pushes and uploads the emulator screenshot/logs as a CI artifact. The Pebble CLI has the build, install, emulator, and screenshot commands; project linting and unit tests are provided by the Node/TypeScript checks rather than nonexistent Pebble CLI subcommands.
+The GitHub Actions workflow performs these checks on pull requests and pushes and uploads the emulator screenshot/logs as a CI artifact. The screenshot smoke check verifies native 200×228 resolution and rejects the uniform mid-gray Alloy fatal dialog; this catches the actual failure mode seen during the first emulator launch, when the CLI command succeeded despite the app exiting with `memory full`. It is a crash smoke test, not a replacement for visual review. The Pebble CLI has the build, install, emulator, and screenshot commands; project linting and unit tests are provided by the Node/TypeScript checks rather than nonexistent Pebble CLI subcommands.
 
 The emulator screenshot now exercises the approved screen composition with preview fixtures. It is not evidence that live providers work or that every visual detail is accepted; inspect the artifact for clipping, text overflow, alignment, colors, and overlap, then repeat the review after live data and image-transfer support are connected.
 

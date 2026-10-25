@@ -80,6 +80,7 @@ jobs:
               sleep 3
               pebble screenshot --no-open --emulator emery artifacts/screenshot_emery.png
             '
+          python scripts/check_screenshot.py artifacts/screenshot_emery.png
 
       - name: Capture emulator diagnostics
         if: always()

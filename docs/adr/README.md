@@ -14,3 +14,5 @@ Accepted decisions are numbered and versioned. A changed decision requires a new
 - ADR-0009 — Pixel font and Poco renderer for the approved high-density layout.
 
 - ADR-0010 — Bounded AppMessage protocol between the watch renderer and native companion.
+
+- ADR-0011 — Explicit Alloy VM memory budget and emulator screenshot failure detection.

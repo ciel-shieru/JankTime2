@@ -20,6 +20,6 @@ Choose option 3. Pin actions to immutable Git commit SHAs and set minimal workfl
 ## Consequences
 
 - Toolchain updates are intentional PRs rather than floating version changes.
-- The screenshot artifact is expected to be reviewed after the final layout exists; the initial scaffold screenshot is only a pipeline smoke test.
+- The screenshot artifact is expected to be reviewed after the final layout exists. The automated checker catches the observed full-screen Alloy memory-error dialog but cannot prove fine-grained layout fidelity.
 - CI must install the emulator's Linux display/runtime dependencies and use a virtual display.
 - This initial workflow covers the watchface. Android companion CI is added with its implementation.

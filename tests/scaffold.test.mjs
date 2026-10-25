@@ -38,6 +38,12 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.deepEqual(pkg.pebble.messageKeys, ["TYPE", "ID", "VALUE", "FLAGS", "EXTRA"]);
     assert.match(model, /function selectAlarmOrBedtime/);
     assert.match(model, /function clipByWidth/);
+    const workflow = read("../.github/workflows/ci.yml");
+    assert.match(workflow, /check_screenshot\.py/);
+    const boot = read("../src/c/mdbl.c");
+    assert.match(boot, /ModdableCreationRecord/);
+    assert.match(boot, /\.slot = 36864/);
+    assert.match(boot, /\.chunk = 28672/);
 });
 
 test("all accepted architecture decisions are present", () => {
@@ -51,6 +57,8 @@ test("all accepted architecture decisions are present", () => {
         "../docs/adr/ADR-0007-mindwtr-server.md",
         "../docs/adr/ADR-0008-ci-and-screenshot.md",
         "../docs/adr/ADR-0009-pixel-font-and-layout-renderer.md",
+        "../docs/adr/ADR-0010-appmessage-protocol.md",
+        "../docs/adr/ADR-0011-alloy-memory-budget.md",
     ]) {
         assert.ok(existsSync(new URL(path, import.meta.url)), "Missing ADR: " + path);
     }

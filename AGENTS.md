@@ -49,4 +49,5 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 - Update an ADR when a material architecture decision changes.
 - Run TypeScript type-check, lint, unit tests, pebble build, and the emery emulator screenshot check before considering watchface code complete.
 - CI screenshot artifacts are build evidence. Inspect them for clipping, overlap, missing resources, incorrect fonts, and layout drift.
-- The current scaffold-only screen is temporary and is not the approved final layout. Do not treat its screenshot as design approval.
+- The current renderer is a preview of the approved layout and uses fixture values until the providers/companion are implemented. Do not treat fixture data as live data or treat one passing screenshot smoke check as final visual acceptance.
+- The normal Alloy mdbl.c template may be changed only for documented runtime heap requirements; record heap sizing in an ADR and keep the total allocation within the emery app-RAM budget.
