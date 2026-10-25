@@ -64,6 +64,11 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 - Document any package manager/hosted-runner inputs that cannot be fully locked in docs/security/dependency-pinning.md. Do not describe system repository trust as equivalent to a committed per-package digest.
 - Dependency version or digest changes must be reviewed together. Never regenerate integrity metadata automatically during normal CI; use a deliberate maintenance process and review generated changes before committing them.
 
+## Automated policy enforcement
+
+- `scripts/check-repo-policy.mjs` is a required CI gate before watchface or Android builds. It checks immutable GitHub Action refs, exact declared tool/dependency versions, package integrity metadata, SDK/Gradle digest manifests, Android Kotlin-only source, Compose + Material 3-only UI, and the external-library justification register.
+- Update the checker when adding a supported dependency ecosystem, toolchain, SDK package, or required Android capability. A passing build is not permission to bypass a policy failure; pin changes and policy exceptions require a reviewed source change.
+
 ## Workflow and commits
 
 - Follow Conventional Commits for all Git commits.

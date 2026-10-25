@@ -1,6 +1,6 @@
 # JankTime2 — Pebble Time 2 (emery) watchface
 
-JankTime2 is a low-power information-dense Pebble Time 2 watchface for the 2026 hardware edition, codename **emery**. The attached approved image defines the layout. The first PR is intentionally the foundation phase: project scaffolding, requirements, architecture decisions, reproducible checks, and screenshot-artifact CI land before the display and provider implementation.
+JankTime2 is a low-power information-dense Pebble Time 2 watchface for the 2026 hardware edition, codename **emery**. The approved reference image defines the layout. PR #1 contains the watchface implementation baseline, native Android companion, provider adapters, architecture decisions, reproducible checks, and CI artifacts. Physical-watch and live-provider validation remain explicit follow-up checks.
 
 > **Current phase:** approved-layout renderer prototype. Normal/local builds keep preview fixtures disabled and display unavailable values until the companion supplies validated data. CI separately enables fixtures only in generated JavaScript to capture a populated screenshot; that preview build must not be distributed. The native Android companion and provider adapters/configurator are present as an initial baseline, Pebble Health uses a narrow C FFI adapter, and live image transfer is implemented. End-to-end phone/watch integration and live provider validation remain in progress.
 

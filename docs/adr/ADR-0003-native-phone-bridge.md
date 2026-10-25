@@ -23,7 +23,7 @@ Do not add src/pkjs/index.js; doing so would select the mutually exclusive Pebbl
 
 - Configuration UX lives in the Android companion, not Clay.
 - The companion's settings and secrets stay on the phone.
-- CI must add Android build/lint/unit tests when the native companion implementation is introduced.
+- CI runs Android unit tests, lint, debug APK assembly, Gradle artifact verification, and dependency-lock digest checks for the native companion.
 - The repository's initial CI validates the watchface toolchain only.
 - Users must install the companion for calendar, phone battery, remote providers, and Wakey integration. Missing companion data must be clearly marked stale/unavailable, not fabricated.
 

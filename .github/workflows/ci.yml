@@ -14,7 +14,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  policy:
+    name: Enforce repository and dependency policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up pinned Node.js for policy checks
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22.16.0
+          check-latest: false
+
+      - name: Enforce dependency and Android source policies
+        run: node scripts/check-repo-policy.mjs
+
   watchface:
+    needs: policy
     name: Lint, test, build, and screenshot (emery)
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -147,6 +165,7 @@ jobs:
           retention-days: 14
 
   companion:
+    needs: policy
     name: Android companion tests, lint, and APK
     runs-on: ubuntu-24.04
     timeout-minutes: 30

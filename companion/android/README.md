@@ -13,7 +13,7 @@ This is the phone-side bridge for the JankTime2 emery watchface. It is a standal
 
 ## Build
 
-Requires JDK 17 and Android SDK 37.
+Requires JDK 17 and Android SDK platform 36 / build-tools 36.0.0, as pinned and fingerprint-verified by CI.
 
 ~~~sh
 ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
@@ -23,4 +23,4 @@ Android background execution is best-effort. WorkManager can defer a scheduled r
 
 ## Current phase
 
-This directory is the implementation baseline. The watch renderer, provider clients, phone data pipeline, task/calendar filtering, image downscaling, and sender are deliberately separated. The initial companion PR should keep tests for URL validation, response bounds, secret encryption, task-ledger behavior, formatting, and refresh-interval validation.
+This directory is the implementation baseline. The watch renderer, provider clients, phone data pipeline, task/calendar filtering, image downscaling, and sender are deliberately separated. Maintain regression tests for URL validation, response bounds, secret encryption, task-ledger behavior, formatting, and refresh-interval validation.
