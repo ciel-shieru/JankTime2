@@ -23,3 +23,4 @@ Accepted decisions are numbered and versioned. A changed decision requires a new
 - ADR-0015 — Phone-side image downscaling and paper-white Poco rendering.
 
 - ADR-0016 — Keep Alloy custom-font manifest sizes synchronized and reject blank renderer screenshots.
+- ADR-0016 — Keep Alloy custom-font manifest sizes synchronized and reject blank renderer screenshots.

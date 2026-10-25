@@ -2,7 +2,7 @@
 
 JankTime2 is a low-power information-dense Pebble Time 2 watchface for the 2026 hardware edition, codename **emery**. The attached approved image defines the layout. The first PR is intentionally the foundation phase: project scaffolding, requirements, architecture decisions, reproducible checks, and screenshot-artifact CI land before the display and provider implementation.
 
-> **Current phase:** approved-layout renderer prototype. The watch draws the composition, a live 24-hour clock, the independently modeled metric slots, and sample content for screenshot review. Sample metrics, task/event rows, phone battery, and alarm time are visual fixtures, not live health, Home Assistant, Prometheus, Mindwtr, calendar, phone-battery, or Wakey data. Provider adapters, the configurator, the native Android companion, and the live user-uploaded image path still need implementation and testing.
+> **Current phase:** approved-layout renderer prototype. Normal/local builds keep preview fixtures disabled and display unavailable values until the companion supplies validated data. CI separately enables fixtures only in generated JavaScript to capture a populated screenshot; that preview build must not be distributed. The native Android companion, provider adapters/configurator, live image transfer, and Pebble Health FFI remain in progress.
 
 ## Goals and non-goals
 
@@ -149,7 +149,7 @@ pebble install --emulator emery
 pebble screenshot --no-open --emulator emery artifacts/screenshot_emery.png
 ~~~
 
-The GitHub Actions workflow performs these checks on pull requests and pushes and uploads the emulator screenshot/logs as a CI artifact. The screenshot smoke check verifies native 200×228 resolution and rejects the uniform mid-gray Alloy fatal dialog; this catches the actual failure mode seen during the first emulator launch, when the CLI command succeeded despite the app exiting with `memory full`. It is a crash smoke test, not a replacement for visual review. The Pebble CLI has the build, install, emulator, and screenshot commands; project linting and unit tests are provided by the Node/TypeScript checks rather than nonexistent Pebble CLI subcommands.
+The GitHub Actions workflow performs these checks on pull requests and pushes and uploads the emulator screenshot/logs as a CI artifact. The screenshot smoke check verifies native 200×228 resolution and rejects both the uniform mid-gray Alloy fatal dialog and blank white screens without dark foreground/blue/yellow accent pixels. It is a crash smoke test, not a replacement for visual review. The CI screenshot uses preview fixture values only after a successful production-mode package build; the preview build is not a release artifact. The Pebble CLI has the build, install, emulator, and screenshot commands; project linting and unit tests are provided by the Node/TypeScript checks rather than nonexistent Pebble CLI subcommands.
 
 The emulator screenshot now exercises the approved screen composition with preview fixtures. It is not evidence that live providers work or that every visual detail is accepted; inspect the artifact for clipping, text overflow, alignment, colors, and overlap, then repeat the review after live data and image-transfer support are connected.
 

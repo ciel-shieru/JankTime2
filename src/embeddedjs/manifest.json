@@ -6,7 +6,8 @@
         "*": [
             "./main",
             "./model",
-            "./bridge"
+            "./bridge",
+            "./config"
         ]
     },
     "resources": {

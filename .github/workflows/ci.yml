@@ -69,6 +69,11 @@ jobs:
       - name: Build Pebble package
         run: pebble build
 
+      - name: Enable preview fixtures for screenshot only
+        run: |
+          npm run enable-preview
+          pebble build
+
       - name: Install and capture emery screenshot
         run: |
           mkdir -p artifacts

@@ -3,7 +3,6 @@ import parseBMF from "commodetto/parseBMF";
 import parseRLE from "commodetto/parseRLE";
 import Battery from "embedded:sensor/Battery";
 import {
-    DEFAULT_SLOT_CONFIGURATION,
     PREVIEW_METRICS,
     clipByWidth,
     formatCalendarRow,
@@ -13,6 +12,7 @@ import {
     type SlotId,
 } from "./model";
 import { displayState, setBridgeRedraw } from "./bridge";
+import { PREVIEW_MODE } from "./config";
 
 const render = new Poco(screen);
 const paper = render.makeColor(255, 255, 255);
@@ -32,8 +32,7 @@ const smallFont = loadFont(12);
 const clockFont = loadFont(42);
 
 let lastDate = new Date();
-let watchBatteryPercent = 0;
-const slotConfiguration = { ...DEFAULT_SLOT_CONFIGURATION };
+let watchBatteryPercent: number | null = null;
 
 // These are visual test fixtures only; provider integrations will replace them.
 const previewPhoneBatteryPercent = 83;
@@ -86,11 +85,11 @@ function drawBluetooth(cx: number, cy: number, color: unknown): void {
     line(cx - 4, cy - 4, cx + 5, cy + 3, color, 2);
     line(cx + 5, cy + 3, cx, cy + 7, color, 2);
 }
-function drawBattery(x: number, y: number, width: number, percent: number, color: unknown): void {
+function drawBattery(x: number, y: number, width: number, percent: number | null, color: unknown): void {
     render.frameRoundRect(x, y, width - 3, 12, color, 1);
     render.drawRoundRect(x + width - 3, y + 3, 3, 6, color, 1);
-    const safe = Math.max(0, Math.min(100, Math.trunc(percent)));
-    centered(String(safe) + "%", smallFont, black, x + Math.floor((width - 3) / 2), y + 1);
+    const safe = percent === null ? null : Math.max(0, Math.min(100, Math.trunc(percent)));
+    centered(safe === null ? "--%" : String(safe) + "%", smallFont, black, x + Math.floor((width - 3) / 2), y + 1);
 }
 function drawMetricIcon(metric: MetricId, cx: number, cy: number, stale: boolean): void {
     const color = stale ? red : blue;
@@ -190,8 +189,8 @@ function drawMetric(slot: SlotId, cx: number, iconY: number, valueY: number, max
     const metric = displayState.slotConfiguration[slot];
     if (metric === "none") return;
     const item = PREVIEW_METRICS[metric];
-    const value = displayState.metricValues[metric] ?? item.value;
-    const stale = displayState.staleMetrics[metric] ?? item.stale;
+    const value = displayState.metricValues[metric] ?? (PREVIEW_MODE ? item.value : "--");
+    const stale = displayState.staleMetrics[metric] ?? (PREVIEW_MODE ? item.stale : true);
     drawMetricIcon(metric, cx, iconY, stale);
     centered(clipped(value, valueFont, maxWidth), valueFont, black, cx, valueY);
 }
@@ -207,38 +206,45 @@ function drawPlanet(): void {
     line(101, 71, 106, 76, paper, 2);
 }
 function drawHeartRate(): void {
-    const samples = displayState.heartSamples ?? heartSamples;
-    const bpm = displayState.currentBpm ?? currentBpm;
-    let minimum = samples[0] ?? bpm;
-    let maximum = minimum;
-    for (const sample of samples) {
-        minimum = Math.min(minimum, sample);
-        maximum = Math.max(maximum, sample);
+    const samples = displayState.heartSamples ?? (PREVIEW_MODE ? heartSamples : []);
+    const bpm = displayState.currentBpm ?? (PREVIEW_MODE ? currentBpm : null);
+    const fresh = displayState.currentBpm !== null || PREVIEW_MODE;
+    const heartColor = fresh ? blue : red;
+    circle(8, 140, 4, heartColor); circle(14, 140, 4, heartColor);
+    line(4, 141, 11, 149, heartColor, 2); line(18, 141, 11, 149, heartColor, 2);
+    render.drawText(bpm === null ? "--" : String(bpm), valueFont, black, 22, 137);
+
+    if (samples.length >= 2) {
+        let minimum = samples[0] ?? 0;
+        let maximum = minimum;
+        for (const sample of samples) {
+            minimum = Math.min(minimum, sample);
+            maximum = Math.max(maximum, sample);
+        }
+        const left = 39, right = 159, top = 136, bottom = 147;
+        const span = Math.max(1, maximum - minimum);
+        let px = left;
+        let py = bottom - Math.round(((samples[0] ?? minimum) - minimum) * (bottom - top) / span);
+        for (let i = 1; i < samples.length; i++) {
+            const sample = samples[i] ?? minimum;
+            const x = left + Math.round(i * (right - left) / (samples.length - 1));
+            const y = bottom - Math.round((sample - minimum) * (bottom - top) / span);
+            line(px, py, x, y, fresh ? blue : red);
+            px = x; py = y;
+        }
+        centered(String(minimum) + "/" + String(maximum), smallFont, black, 179, 138);
+    } else {
+        centered("--/--", smallFont, black, 179, 138);
     }
-    circle(8, 140, 4, blue); circle(14, 140, 4, blue);
-    line(4, 141, 11, 149, blue, 2); line(18, 141, 11, 149, blue, 2);
-    render.drawText(String(bpm), valueFont, black, 22, 137);
-    const left = 39, right = 159, top = 136, bottom = 147;
-    const span = Math.max(1, maximum - minimum);
-    let px = left;
-    let py = bottom - Math.round(((samples[0] ?? minimum) - minimum) * (bottom - top) / span);
-    for (let i = 1; i < samples.length; i++) {
-        const value = samples[i] ?? minimum;
-        const x = left + Math.round(i * (right - left) / (samples.length - 1));
-        const y = bottom - Math.round((value - minimum) * (bottom - top) / span);
-        line(px, py, x, y, blue);
-        px = x; py = y;
-    }
-    centered(String(minimum) + "/" + String(maximum), smallFont, black, 179, 138);
 }
 function drawRows(): void {
     const focus = [
-        displayState.focusRows[0] ?? formatFocusRow("09:30", "17:00", 2, "Submit lab report"),
-        displayState.focusRows[1] ?? formatFocusRow("13:00", "18:30", 1, "Review cluster alerts"),
+        displayState.focusRows[0] ?? (PREVIEW_MODE ? formatFocusRow("09:30", "17:00", 2, "Submit lab report") : ""),
+        displayState.focusRows[1] ?? (PREVIEW_MODE ? formatFocusRow("13:00", "18:30", 1, "Review cluster alerts") : ""),
     ];
     const events = [
-        displayState.calendarRows[0] ?? formatCalendarRow("10:00", "Campus", "Systems lab"),
-        displayState.calendarRows[1] ?? formatCalendarRow("15:30", "Home", "Model eval run"),
+        displayState.calendarRows[0] ?? (PREVIEW_MODE ? formatCalendarRow("10:00", "Campus", "Systems lab") : ""),
+        displayState.calendarRows[1] ?? (PREVIEW_MODE ? formatCalendarRow("15:30", "Home", "Model eval run") : ""),
     ];
     line(5, 153, 195, 153, black);
     render.drawText(clipped(focus[0] ?? "", smallFont, 190), smallFont, black, 6, 159);
@@ -249,23 +255,22 @@ function drawRows(): void {
 }
 function drawStatus(date: Date): void {
     render.drawText(labelDate(date), statusFont, black, 5, 3);
-    const selected = displayState.alarmTime === null
-        ? null
-        : { time: displayState.alarmTime, isBedtime: displayState.alarmIsBedtime };
-    const isBedtime = selected?.isBedtime ?? (
-        previewBedtimeAt !== null && previewBedtimeAt.getTime() < previewAlarmAt.getTime()
-    );
-    if (isBedtime) {
+    const previewAlarm = PREVIEW_MODE ? formatTime24(previewAlarmAt) : null;
+    const alarmTime = displayState.alarmTime ?? previewAlarm;
+    const bedtime = displayState.alarmTime !== null
+        ? displayState.alarmIsBedtime
+        : PREVIEW_MODE && previewBedtimeAt !== null && previewBedtimeAt.getTime() < previewAlarmAt.getTime();
+    if (bedtime) {
         circle(62, 9, 6, blue);
         circle(65, 6, 5, paper);
     } else {
-        drawAlarm(62, 9, black);
+        drawAlarm(62, 9, alarmTime === null ? red : black);
     }
-    render.drawText(selected?.time ?? formatTime24(previewAlarmAt), statusFont, black, 71, 3);
+    render.drawText(alarmTime ?? "--:--", statusFont, black, 71, 3);
     const phoneBluetoothConnected = displayState.phoneBluetoothConnected;
     const bluetoothConnected = watch.connected.app && phoneBluetoothConnected === true;
     drawBluetooth(111, 10, bluetoothConnected ? blue : red);
-    drawBattery(126, 4, 32, displayState.phoneBatteryPercent ?? previewPhoneBatteryPercent, yellow);
+    drawBattery(126, 4, 32, displayState.phoneBatteryPercent ?? (PREVIEW_MODE ? previewPhoneBatteryPercent : null), yellow);
     drawBattery(163, 4, 34, watchBatteryPercent, blue);
     line(5, 20, 195, 20, black);
 }
