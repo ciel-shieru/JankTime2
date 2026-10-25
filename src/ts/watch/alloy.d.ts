@@ -51,6 +51,9 @@ declare module "embedded:sensor/Battery" {
 declare module "pebble/message" {
     interface MessageOptions {
         keys: string[];
+        /** Incoming/outgoing AppMessage buffer capacities in bytes. */
+        input?: number;
+        output?: number;
         onReadable?: (this: WatchMessage) => void;
         onWritable?: (this: WatchMessage) => void;
         onSuspend?: (this: WatchMessage) => void;

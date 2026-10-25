@@ -38,6 +38,9 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.deepEqual(pkg.pebble.messageKeys, ["TYPE", "ID", "VALUE", "FLAGS", "EXTRA"]);
     assert.match(bridge, /input: 124/);
     assert.match(bridge, /output: 124/);
+    const alloyTypes = read("../src/ts/watch/alloy.d.ts");
+    assert.match(alloyTypes, /input\?: number/);
+    assert.match(alloyTypes, /output\?: number/);
     assert.match(model, /function selectAlarmOrBedtime/);
     assert.match(model, /function clipByWidth/);
     const workflow = read("../.github/workflows/ci.yml");
