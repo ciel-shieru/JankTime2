@@ -41,21 +41,14 @@ jobs:
           sudo apt-get install --yes --no-install-recommends \
             libsdl2-2.0-0 libglib2.0-0 libpixman-1-0 zlib1g libsndio7.0 xvfb
 
-      - name: Bootstrap SHA-256 pins for Pebble tool (temporary lock generation)
+      - name: Install SHA-256-pinned Pebble tool
         env:
           PIP_DISABLE_PIP_VERSION_CHECK: "1"
           PIP_NO_INPUT: "1"
         run: |
           set -euo pipefail
-          mkdir -p artifacts/dependency-bootstrap
-          python -m pip install --dry-run --ignore-installed \
-            --report artifacts/dependency-bootstrap/pebble-tool-report.json \
-            pebble-tool==5.0.40
-          python scripts/pip-report-to-lock.py \
-            artifacts/dependency-bootstrap/pebble-tool-report.json \
-            artifacts/dependency-bootstrap/pebble-tool.lock
           python -m pip install --user --no-warn-script-location --require-hashes \
-            -r artifacts/dependency-bootstrap/pebble-tool.lock
+            -r requirements/pebble-tool.lock
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/pebble" --version
 
@@ -70,8 +63,12 @@ jobs:
             find "$HOME" -maxdepth 7 -type d -iname '*pebble*' -print >&2 || true
             exit 1
           fi
+          mkdir -p artifacts/dependency-bootstrap
           python scripts/pebble-sdk-manifest.py --root "$sdk_root" \
             --write artifacts/dependency-bootstrap/pebble-sdk-4.33.1.json
+          sha256sum companion/android/gradle/wrapper/gradle-wrapper.jar |
+            awk '{print $1 "  gradle-wrapper.jar"}' \
+              > artifacts/dependency-bootstrap/gradle-wrapper.jar.sha256
 
       - name: Install exact npm dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -182,14 +179,21 @@ jobs:
             companion/android/**/gradle.lockfile
             companion/android/gradle/verification-metadata.xml
 
-      - name: Install Android SDK platform
+      - name: Install and digest-pin Android SDK inputs
         shell: bash
         run: |
           set -euo pipefail
           sdkmanager_bin="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
           test -x "$sdkmanager_bin"
           yes | "$sdkmanager_bin" --licenses >/dev/null || true
-          "$sdkmanager_bin" "platforms;android-36"
+          "$sdkmanager_bin" "platforms;android-36" "build-tools;36.0.0"
+          mkdir -p artifacts/dependency-bootstrap
+          python scripts/pebble-sdk-manifest.py \
+            --root "$ANDROID_HOME/platforms/android-36" \
+            --write artifacts/dependency-bootstrap/android-platform-36.json
+          python scripts/pebble-sdk-manifest.py \
+            --root "$ANDROID_HOME/build-tools/36.0.0" \
+            --write artifacts/dependency-bootstrap/android-build-tools-36.0.0.json
 
       - name: Generate and verify Android dependency locks and checksums
         shell: bash
