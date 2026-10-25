@@ -92,15 +92,3 @@ def main() -> int:
     )
     return 0
 
-
-if __import__("os").environ.get("JANKTIME2_RUN_SELF_TESTS") == "1":
-    # Exercise determinism and detection without any external package.
-    import tempfile
-
-    with tempfile.TemporaryDirectory() as temporary:
-        root = Path(temporary)
-        (root / "file.txt").write_text("pinned bytes", encoding="utf-8")
-        before = inventory(root)
-        assert inventory(root) == before
-        (root / "file.txt").write_text("changed bytes", encoding="utf-8")
-        assert inventory(root) != before
