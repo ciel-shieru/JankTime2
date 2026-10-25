@@ -78,3 +78,7 @@ pebble-logs.txt
 # Moddable-generated custom font resources
 src/embeddedjs/assets/*.fnt
 src/embeddedjs/assets/*.bm4
+
+# Materialized from source-pinned Gradle lock metadata by CI/local setup
+companion/android/gradle/verification-metadata.xml
+companion/android/app/gradle.lockfile

@@ -56,8 +56,8 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 
 - Every direct and transitive code/build dependency must be pinned to an exact version and an integrity digest wherever its package ecosystem supports it. No version ranges, floating tags, latest labels, unpinned Git refs, or unlocked transitive resolution.
 - Keep npm dependencies in package-lock.json with registry integrity fields and use npm ci.
-- Keep Python tooling in a requirements lock with exact versions and SHA-256 hashes for every resolved package.
-- Enable Gradle dependency locking and commit the resulting gradle.lockfile files. Commit companion/android/gradle/verification-metadata.xml with SHA-256 checksums for downloaded Maven/plugin artifacts and metadata. Builds must fail closed on missing/mismatched verification entries.
+- Keep Python tooling in a requirements lock with exact versions and SHA-256 hashes for every resolved package. SHA-256-pin the complete installed Pebble SDK and Android SDK package trees through reviewed compact manifests in tooling/.
+- Enable Gradle dependency locking. The exact full-file SHA-256 pins for the generated app gradle.lockfile and Gradle verification-metadata.xml are source-controlled in tooling/gradle-dependency-pins.sha256; CI regenerates candidates, rejects any byte-level drift against those reviewed pins, then runs a second build with Gradle's strict artifact and metadata verification enabled. Never update the digests automatically in normal CI.
 - Pin the Gradle distribution by exact version and distributionSha256Sum; verify the checked-in Gradle wrapper JAR when it changes.
 - Pin Pebble tool and SDK versions; verify installed SDK inputs against the reviewed SHA-256 manifest in tooling/.
 - Pin GitHub Actions by full commit SHA. Use exact patch/build versions for Node.js, Python, and the JDK. Where official installers provide and verify archive checksums, retain that verification; do not replace it with a mutable download URL alone.

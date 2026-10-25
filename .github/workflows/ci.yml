@@ -52,7 +52,7 @@ jobs:
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
           "$HOME/.local/bin/pebble" --version
 
-      - name: Install and digest-pin Pebble SDK
+      - name: Install and verify SHA-256-pinned Pebble SDK
         run: |
           set -euo pipefail
           "$HOME/.local/bin/pebble" sdk install 4.33.1
@@ -63,12 +63,8 @@ jobs:
             find "$HOME" -maxdepth 7 -type d -iname '*pebble*' -print >&2 || true
             exit 1
           fi
-          mkdir -p artifacts/dependency-bootstrap
           python scripts/pebble-sdk-manifest.py --root "$sdk_root" \
-            --write artifacts/dependency-bootstrap/pebble-sdk-4.33.1.json
-          sha256sum companion/android/gradle/wrapper/gradle-wrapper.jar |
-            awk '{print $1 "  gradle-wrapper.jar"}' \
-              > artifacts/dependency-bootstrap/gradle-wrapper.jar.sha256
+            --verify tooling/pebble-sdk-4.33.1.json
 
       - name: Install exact npm dependencies
         run: npm ci --ignore-scripts --no-audit --no-fund
@@ -150,15 +146,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Upload dependency lock bootstrap outputs
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: janktime2-toolchain-dependency-bootstrap
-          path: artifacts/dependency-bootstrap/
-          if-no-files-found: error
-          retention-days: 14
-
   companion:
     name: Android companion tests, lint, and APK
     runs-on: ubuntu-24.04
@@ -179,7 +166,7 @@ jobs:
             companion/android/**/gradle.lockfile
             companion/android/gradle/verification-metadata.xml
 
-      - name: Install and digest-pin Android SDK inputs
+      - name: Install and verify SHA-256-pinned Android SDK inputs
         shell: bash
         run: |
           set -euo pipefail
@@ -187,33 +174,31 @@ jobs:
           test -x "$sdkmanager_bin"
           yes | "$sdkmanager_bin" --licenses >/dev/null || true
           "$sdkmanager_bin" "platforms;android-36" "build-tools;36.0.0"
-          mkdir -p artifacts/dependency-bootstrap
           python scripts/pebble-sdk-manifest.py \
             --root "$ANDROID_HOME/platforms/android-36" \
-            --write artifacts/dependency-bootstrap/android-platform-36.json
+            --verify tooling/android-platform-36.json
           python scripts/pebble-sdk-manifest.py \
             --root "$ANDROID_HOME/build-tools/36.0.0" \
-            --write artifacts/dependency-bootstrap/android-build-tools-36.0.0.json
+            --verify tooling/android-build-tools-36.0.0.json
 
-      - name: Generate and verify Android dependency locks and checksums
+      - name: Verify Android dependency pins and enforce Gradle checksums
         shell: bash
         run: |
           set -euo pipefail
           chmod +x companion/android/gradlew
+          # Check the wrapper JAR before executing it.
+          (cd companion/android/gradle/wrapper && sha256sum --check gradle-wrapper.jar.sha256)
+          # The first invocation creates candidate metadata only. Its full-file
+          # SHA-256 pins are committed in tooling/gradle-dependency-pins.sha256.
+          # Fail before the separate strict build if dependency metadata or lock
+          # content diverges from the reviewed pins.
           ./companion/android/gradlew -p companion/android --no-daemon \
             --write-verification-metadata sha256 --write-locks \
             :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
-          # A second non-bootstrap invocation must enforce the just-generated locks.
+          sha256sum --check tooling/gradle-dependency-pins.sha256
+          # This invocation uses Gradle's strict artifact and metadata verification.
           ./companion/android/gradlew -p companion/android --no-daemon \
             :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
-          mkdir -p artifacts/dependency-bootstrap/companion/android/gradle
-          cp companion/android/gradle/verification-metadata.xml \
-            artifacts/dependency-bootstrap/companion/android/gradle/verification-metadata.xml
-          find companion/android -name gradle.lockfile -type f -print0 |
-            while IFS= read -r -d '' lockfile; do
-              mkdir -p "artifacts/dependency-bootstrap/$(dirname "$lockfile")"
-              cp "$lockfile" "artifacts/dependency-bootstrap/$lockfile"
-            done
 
       - name: Upload debug APK for integration testing
         if: success()
@@ -224,11 +209,3 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-      - name: Upload Android dependency lock bootstrap outputs
-        if: always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: janktime2-android-dependency-bootstrap
-          path: artifacts/dependency-bootstrap/
-          if-no-files-found: error
-          retention-days: 14

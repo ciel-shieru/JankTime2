@@ -7,7 +7,7 @@ JankTime2 is expected to build from the same declared versions and package bytes
 - GitHub Actions are referenced by full commit SHA, not a mutable version tag.
 - npm packages are locked in `package-lock.json`, with registry integrity hashes; use `npm ci`, not `npm install`, in CI.
 - Python build tools are installed from a hash-enforced requirements lock. Every direct and transitive requirement must use an exact version and SHA-256 hash.
-- Gradle dependencies and plugin artifacts are locked with Gradle dependency lockfiles and checked against `companion/android/gradle/verification-metadata.xml`. Artifact checksums cover jars, AARs, POMs, Gradle module metadata, and plugin artifacts. Do not commit a dependency upgrade without reviewing the version and its checksum changes.
+- Gradle's generated dependency lockfile and full `verification-metadata.xml` are each pinned by their exact SHA-256 in `tooling/gradle-dependency-pins.sha256`. This compact integrity manifest pins the complete generated files without checking a large verbose XML file into source. CI regenerates the candidates with an exact, pinned plugin/dependency graph, checks both full-file digests, and fails on any drift before doing a separate build. That second invocation consumes the generated verification metadata; `verify-metadata` is enabled and Gradle validates artifact and metadata checksums strictly. A lock update requires review of the complete metadata diff and intentional update of the committed digests.
 - Gradle wrapper distributions use an exact URL/version plus `distributionSha256Sum`. The wrapper JAR itself is a checked-in binary input and must be verified when upgraded.
 - The Pebble SDK version is exact and its installed files are checked against a source-controlled SHA-256 manifest. Rebaseline the manifest only during an intentional SDK upgrade after inspecting the upstream release and diff.
 - Node.js, Python, and the JDK are selected by exact patch/build version through setup actions pinned by commit SHA. The setup actions validate downloaded toolchain archives against their published checksums.
@@ -21,7 +21,7 @@ JankTime2 is expected to build from the same declared versions and package bytes
 4. Run all repository CI checks with verification enabled before merging.
 5. Document any dependency outside AndroidX/Google's Android libraries in `companion/README.md`, including why an equivalent maintained Android/JDK API would be more complex or less safe.
 
-Never use floating versions, dependency ranges, `latest` labels, unpinned Git references, or install commands that resolve transitive packages without a lock. Any bootstrap procedure used to create lockfiles is temporary maintenance tooling; normal CI must consume committed lockfiles and fail on missing or changed digests.
+Never use floating versions, dependency ranges, `latest` labels, unpinned Git references, or unverified transitive resolution. The Gradle candidate-generation step is allowed only because both full output files must exactly match committed SHA-256 pins and the actual build/test run is repeated with verification enabled. Never change those expected digests just to make CI green; inspect why resolution changed first.
 
 ## Trust boundary
 
