@@ -200,7 +200,7 @@ function drawMetric(slot: SlotId, cx: number, iconY: number, valueY: number, max
 function drawPlanet(): void {
     const planetTop = 62;
     const rows = displayState.imageRows;
-    if (rows !== null && rows.length === 30 && rows.every((row) => /^[01]{30}$/.test(row))) {
+    if (rows !== null && rows.length === 30 && rows.every((row) => /^[01]{30}$/.test(row)) && rows.some((row) => row.includes("1"))) {
         for (let y = 0; y < 30; y++) {
             const row = rows[y] ?? "";
             for (let x = 0; x < 30; x++) {

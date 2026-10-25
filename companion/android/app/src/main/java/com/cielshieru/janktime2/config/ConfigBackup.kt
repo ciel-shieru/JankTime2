@@ -105,7 +105,9 @@ object ConfigBackupCodec {
             return RefreshIntervals.validate(value.toInt())
         }
 
-        val slotObject = c.optJSONObject("metricSlots") ?: JSONObject()
+        val slotObject = if (!c.has("metricSlots")) JSONObject() else {
+            c.optJSONObject("metricSlots") ?: throw IllegalArgumentException("Metric slots must be a JSON object.")
+        }
         val slots = CompanionConfig.DEFAULT_SLOTS.toMutableMap()
         val slotIterator = slotObject.keys()
         while (slotIterator.hasNext()) {
@@ -115,7 +117,9 @@ object ConfigBackupCodec {
             require(value is String && value in metricIds) { "Invalid metric assignment for slot: " + slot }
             slots[slot] = value
         }
-        val selectedArray = c.optJSONArray("selectedCalendarIds") ?: JSONArray()
+        val selectedArray = if (!c.has("selectedCalendarIds")) JSONArray() else {
+            c.optJSONArray("selectedCalendarIds") ?: throw IllegalArgumentException("Selected calendar IDs must be a JSON array.")
+        }
         require(selectedArray.length() <= 200) { "Too many selected calendars in backup." }
         val calendarIds = buildSet {
             for (i in 0 until selectedArray.length()) {
@@ -126,7 +130,9 @@ object ConfigBackupCodec {
                 add(item)
             }
         }
-        val filterArray = c.optJSONArray("calendarBlocklist") ?: JSONArray()
+        val filterArray = if (!c.has("calendarBlocklist")) JSONArray() else {
+            c.optJSONArray("calendarBlocklist") ?: throw IllegalArgumentException("Calendar blocklist must be a JSON array.")
+        }
         require(filterArray.length() <= 10) { "Too many calendar blocklist patterns." }
         val filters = buildList {
             for (i in 0 until filterArray.length()) {

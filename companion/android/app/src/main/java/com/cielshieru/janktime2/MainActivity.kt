@@ -128,7 +128,16 @@ class MainActivity : ComponentActivity() {
                                     backup.secrets.orEmpty().forEach { (key, value) -> secrets.put(key, value) }
                                 }
                             }
-                            RefreshScheduler(applicationContext).scheduleNext(1L, ExistingWorkPolicy.REPLACE)
+                            runCatching {
+                                val report = SnapshotRefresher(applicationContext).refreshAndSend(forceRefresh = true)
+                                if (report.unavailableSources.isNotEmpty()) {
+                                    deliveryWarning = report.userMessage()
+                                }
+                            }.onFailure { failure ->
+                                deliveryWarning = "Configuration was restored on the phone, but the watch could not be refreshed: " +
+                                    (failure.message ?: "check the selected mobile-app bridge and watch connection").take(160)
+                            }
+                            RefreshScheduler(applicationContext).scheduleNext(existingWorkPolicy = ExistingWorkPolicy.REPLACE)
                             deliveryWarning
                         },
                     )

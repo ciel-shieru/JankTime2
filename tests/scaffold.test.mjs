@@ -73,6 +73,7 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(renderer.includes("drawBluetooth(136, statusCenterY"));
     assert.ok(renderer.includes("const statusCenterY = 10"));
     assert.ok(renderer.includes("planetTop = 62"));
+    assert.ok(renderer.includes('rows.some((row) => row.includes("1"))'), "An empty image should keep the framed image cell instead of clearing the frame.");
     assert.ok(renderer.includes('drawMetric("grid.bottom.1", 20, 72, 98, 36)'));
     assert.ok(renderer.includes('centered(formatTime24(lastDate), clockFont, black, 100, 135)'));
     assert.ok(renderer.includes('drawMetric("clock.left", 20, 108, 134, 36)'));
@@ -93,6 +94,9 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     const backupSource = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/config/ConfigBackup.kt");
     assert.ok(backupSource.includes("schemaVersion"));
     assert.ok(backupSource.includes("MAX_IMPORT_BYTES"));
+    assert.ok(backupSource.includes("Metric slots must be a JSON object."));
+    assert.ok(backupSource.includes("Selected calendar IDs must be a JSON array."));
+    assert.ok(backupSource.includes("Calendar blocklist must be a JSON array."));
     assert.ok(backupSource.includes("imageRows"));
     assert.ok(backupSource.includes("Image backup must be a 30×30 one-bit map."));
     assert.ok(backupSource.includes("validateHttpsUrl"));
@@ -100,6 +104,7 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(companionScreen.includes("Export without secrets"));
     assert.ok(companionScreen.includes("Danger: plaintext secrets"));
     assert.ok(companionScreen.includes("Restore included secrets"));
+    assert.ok(companionScreen.includes("refreshAndSend(forceRefresh = true)"));
     assert.ok(companionScreen.includes("Import from file"));
     assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_BASE64"));
     assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD"));
