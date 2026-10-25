@@ -63,6 +63,8 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     const refreshSource = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/data/RefreshIntervals.kt");
     assert.match(refreshSource, /config\.genericSensorEntity/);
     assert.match(refreshSource, /metrics\["haSensor"\]/);
+    assert.match(refreshSource, /Failure of one entity must not prevent independent HA metrics updating/);
+    assert.match(refreshSource, /A bad query only marks its own metric stale/);
     const companionScreen = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/MainActivity.kt");
     assert.match(companionScreen, /Generic Home Assistant sensor entity/);
     const companionBridge = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/pebble/PebbleBridge.kt");

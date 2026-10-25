@@ -14,7 +14,8 @@ class SnapshotAndTaskTest {
         )
         val report = RefreshReport(listOf("Home Assistant", "Prometheus", "Home Assistant"))
         val message = report.userMessage()
-        assertTrue(message.contains("Home Assistant, Prometheus"))
+        assertTrue(message.contains("Home Assistant (HTTPS URL, token"))
+        assertTrue(message.contains("Prometheus (HTTPS URL, token"))
         assertTrue(message.contains("Watch updated where data is available"))
         assertTrue(!message.contains("token") && !message.contains("https://"))
     }

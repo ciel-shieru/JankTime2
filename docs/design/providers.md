@@ -47,7 +47,7 @@ Each can be configured to an integer 1–60 minute interval. Refresh on the phon
 
 ## Cache and failure semantics
 
-Cache a minimal, validated last-successful snapshot per provider, including fetch timestamp, and schema version. Update the cache atomically only after a full response passes validation. If a provider times out, returns a non-success status, changes schema unexpectedly, or provides invalid data, retain the old snapshot. Mark only that source stale; its associated icons turn red. Never replace a good cache with an error body or partial parse.
+Cache a minimal, validated last-successful snapshot per provider, including fetch timestamp, and schema version. Update the cache atomically only after a full response passes validation. If an entity or query times out, returns a non-success status, changes schema unexpectedly, or provides invalid data, retain its old value and mark that metric stale; its associated icon turns red. Continue refreshing independent entities and queries so one invalid entity or PromQL expression cannot suppress otherwise valid metrics. Never replace a good cache with an error body or partial parse.
 
 Cap response bodies and output fields. Use a bounded network timeout, retry with backoff rather than a tight loop, and honor the user-selected refresh interval. A successful response clears stale status.
 

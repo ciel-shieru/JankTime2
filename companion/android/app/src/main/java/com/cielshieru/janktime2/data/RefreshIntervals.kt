@@ -56,80 +56,123 @@ class SnapshotRefresher(private val context: Context) {
 
         if (due(snapshot, "homeAssistant", config.refreshHomeAssistantMinutes) || forceRefresh) {
             snapshot = snapshot.attempted("homeAssistant", now)
-            try {
-                val base = config.homeAssistantUrl
-                val hasEntity = listOf(config.sensorEntity, config.genericSensorEntity, config.waterEntity, config.weatherEntity, config.climateEntity)
-                    .any { it.isNotBlank() }
-                if (base.isBlank() || !hasEntity) throw IllegalStateException("Home Assistant is not configured.")
-                val token = credentials.get("home_assistant")
-                    ?: throw IllegalStateException("Home Assistant token is not configured.")
-                val metrics = mutableMapOf<String, String>()
+            val base = config.homeAssistantUrl
+            val token = credentials.get("home_assistant")
+            val configuredMetrics = buildList {
+                if (config.sensorEntity.isNotBlank()) add("fanState")
+                if (config.genericSensorEntity.isNotBlank()) add("haSensor")
+                if (config.waterEntity.isNotBlank()) add("water")
+                if (config.weatherEntity.isNotBlank()) {
+                    add("weatherFeelsLike")
+                    add("rainChance")
+                }
+                if (config.climateEntity.isNotBlank()) add("haClimateValue")
+            }
+
+            if (configuredMetrics.isEmpty() || base.isBlank() || token.isNullOrBlank()) {
+                unavailableSources += "Home Assistant"
+                snapshot = snapshot.markStale(
+                    if (configuredMetrics.isEmpty()) {
+                        listOf("fanState", "haSensor", "water", "haClimateValue", "weatherFeelsLike", "rainChance")
+                    } else configuredMetrics,
+                )
+            } else {
+                var anySuccess = false
+                fun updateHaMetric(metric: String, fetch: () -> String?) {
+                    try {
+                        val value = fetch()?.takeIf { it.isNotBlank() }
+                        if (value == null) {
+                            snapshot = snapshot.markStale(listOf(metric))
+                            unavailableSources += "Home Assistant"
+                        } else {
+                            snapshot = snapshot.withMetric(metric, value)
+                            anySuccess = true
+                        }
+                    } catch (_: Exception) {
+                        // Failure of one entity must not prevent independent HA metrics updating.
+                        snapshot = snapshot.markStale(listOf(metric))
+                        unavailableSources += "Home Assistant"
+                    }
+                }
+
                 if (config.sensorEntity.isNotBlank()) {
-                    metrics["fanState"] = ha.sensorValue(base, token, config.sensorEntity)
-                        ?: throw IllegalStateException("Sensor value is unavailable.")
+                    updateHaMetric("fanState") { ha.sensorValue(base, token, config.sensorEntity) }
                 }
                 if (config.genericSensorEntity.isNotBlank()) {
-                    metrics["haSensor"] = ha.sensorValue(base, token, config.genericSensorEntity)
-                        ?: throw IllegalStateException("Generic sensor value is unavailable.")
+                    updateHaMetric("haSensor") { ha.sensorValue(base, token, config.genericSensorEntity) }
                 }
                 if (config.waterEntity.isNotBlank()) {
-                    metrics["water"] = ha.sensorValue(base, token, config.waterEntity)
-                        ?: throw IllegalStateException("Water sensor value is unavailable.")
+                    updateHaMetric("water") { ha.sensorValue(base, token, config.waterEntity) }
                 }
                 if (config.climateEntity.isNotBlank()) {
-                    metrics["haClimateValue"] = ha.climateDisplayValue(base, token, config.climateEntity, config.climateAttribute)
-                        ?: throw IllegalStateException("Climate value is unavailable.")
+                    updateHaMetric("haClimateValue") {
+                        ha.climateDisplayValue(base, token, config.climateEntity, config.climateAttribute)
+                    }
                 }
                 if (config.weatherEntity.isNotBlank()) {
-                    val weather = ha.fetchWeather(base, token, config.weatherEntity)
-                    snapshot = snapshot.copy(weatherCondition = weather.condition)
-                    val feelsLike = weather.feelsLikeTemperature?.let { "%.0f°".format(it) }
-                    val rainChance = weather.rainChancePercent?.let { "$it%" }
-                    if (feelsLike != null) {
-                        snapshot = snapshot.withMetric("weatherFeelsLike", feelsLike)
-                    } else {
-                        snapshot = snapshot.markStale(listOf("weatherFeelsLike"))
-                    }
-                    if (rainChance != null) {
-                        snapshot = snapshot.withMetric("rainChance", rainChance)
-                    } else {
-                        snapshot = snapshot.markStale(listOf("rainChance"))
+                    try {
+                        val weather = ha.fetchWeather(base, token, config.weatherEntity)
+                        snapshot = snapshot.copy(weatherCondition = weather.condition)
+                        val feelsLike = weather.feelsLikeTemperature?.let { "%.0f°".format(it) }
+                        val rainChance = weather.rainChancePercent?.let { "$it%" }
+                        if (feelsLike != null) {
+                            snapshot = snapshot.withMetric("weatherFeelsLike", feelsLike)
+                            anySuccess = true
+                        } else {
+                            snapshot = snapshot.markStale(listOf("weatherFeelsLike"))
+                            unavailableSources += "Home Assistant"
+                        }
+                        if (rainChance != null) {
+                            snapshot = snapshot.withMetric("rainChance", rainChance)
+                            anySuccess = true
+                        } else {
+                            snapshot = snapshot.markStale(listOf("rainChance"))
+                            unavailableSources += "Home Assistant"
+                        }
+                    } catch (_: Exception) {
+                        snapshot = snapshot.markStale(listOf("weatherFeelsLike", "rainChance"))
+                        unavailableSources += "Home Assistant"
                     }
                 }
-                for ((id, value) in metrics) snapshot = snapshot.withMetric(id, value)
-                snapshot = snapshot.succeeded("homeAssistant", now)
-            } catch (_: Exception) {
-                unavailableSources += "Home Assistant"
-                snapshot = snapshot.markStale(listOf("fanState", "haSensor", "water", "haClimateValue", "weatherFeelsLike", "rainChance"))
+                if (anySuccess) snapshot = snapshot.succeeded("homeAssistant", now)
             }
         }
 
         if (due(snapshot, "prometheus", config.refreshPrometheusMinutes) || forceRefresh) {
             snapshot = snapshot.attempted("prometheus", now)
-            try {
-                val token = credentials.get("prometheus")
-                val base = config.prometheusUrl
-                val hasQuery = listOf(config.cpuQuery, config.memoryQuery, config.alertQuery).any { it.isNotBlank() }
-                if (base.isBlank() || !hasQuery) throw IllegalStateException("Prometheus is not configured.")
-                if (config.cpuQuery.isNotBlank()) {
-                    val value = prometheus.instantQuery(base, config.cpuQuery, token)
-                    snapshot = if (value != null) snapshot.withMetric("cpuUsage", value)
-                        else snapshot.markStale(listOf("cpuUsage"))
-                }
-                if (config.memoryQuery.isNotBlank()) {
-                    val value = prometheus.instantQuery(base, config.memoryQuery, token)
-                    snapshot = if (value != null) snapshot.withMetric("memoryUsage", value)
-                        else snapshot.markStale(listOf("memoryUsage"))
-                }
-                if (config.alertQuery.isNotBlank()) {
-                    val value = prometheus.instantQuery(base, config.alertQuery, token)
-                    snapshot = if (value != null) snapshot.withMetric("alertCount", value)
-                        else snapshot.markStale(listOf("alertCount"))
-                }
-                snapshot = snapshot.succeeded("prometheus", now)
-            } catch (_: Exception) {
+            val token = credentials.get("prometheus")
+            val base = config.prometheusUrl
+            val queries = listOf(
+                "cpuUsage" to config.cpuQuery,
+                "memoryUsage" to config.memoryQuery,
+                "alertCount" to config.alertQuery,
+            ).filter { it.second.isNotBlank() }
+
+            if (base.isBlank() || queries.isEmpty()) {
                 unavailableSources += "Prometheus"
-                snapshot = snapshot.markStale(listOf("cpuUsage", "memoryUsage", "alertCount"))
+                snapshot = snapshot.markStale(
+                    if (queries.isEmpty()) listOf("cpuUsage", "memoryUsage", "alertCount")
+                    else queries.map { it.first },
+                )
+            } else {
+                var anySuccess = false
+                for ((metric, query) in queries) {
+                    try {
+                        val value = prometheus.instantQuery(base, query, token)
+                        if (value != null) {
+                            snapshot = snapshot.withMetric(metric, value)
+                            anySuccess = true
+                        } else {
+                            snapshot = snapshot.markStale(listOf(metric))
+                            unavailableSources += "Prometheus"
+                        }
+                    } catch (_: Exception) {
+                        // A bad query only marks its own metric stale; other queries still run.
+                        snapshot = snapshot.markStale(listOf(metric))
+                        unavailableSources += "Prometheus"
+                    }
+                }
+                if (anySuccess) snapshot = snapshot.succeeded("prometheus", now)
             }
         }
 
