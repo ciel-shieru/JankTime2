@@ -196,6 +196,7 @@ let nativeHealth: NativeHealthSnapshot = {
 let lastHealthMinute = -1;
 
 function refreshHealthForMinute(date: Date): void {
+    if (PREVIEW_MODE) return;
     const key = Math.floor(date.getTime() / 60000);
     if (key === lastHealthMinute) return;
     lastHealthMinute = key;

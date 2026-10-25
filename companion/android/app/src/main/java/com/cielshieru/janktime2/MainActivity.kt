@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.work.ExistingWorkPolicy
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -71,7 +72,7 @@ class MainActivity : ComponentActivity() {
                             secretUpdates.forEach { (key, value) ->
                                 if (value.isNotBlank()) secrets.put(key, value)
                             }
-                            RefreshScheduler(this).scheduleNext(1L)
+                            RefreshScheduler(this).scheduleNext(1L, ExistingWorkPolicy.REPLACE)
                         },
                         onRefresh = {
                             lifecycleScope.launch(Dispatchers.IO) {

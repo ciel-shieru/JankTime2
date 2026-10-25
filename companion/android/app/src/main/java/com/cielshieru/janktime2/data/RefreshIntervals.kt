@@ -169,14 +169,17 @@ class SnapshotRefresher(private val context: Context) {
 }
 
 class RefreshScheduler(private val context: Context) {
-    fun scheduleNext(delayMinutes: Long? = null) {
+    fun scheduleNext(
+        delayMinutes: Long? = null,
+        existingWorkPolicy: ExistingWorkPolicy = ExistingWorkPolicy.APPEND_OR_REPLACE,
+    ) {
         val delay = delayMinutes ?: nextDueMinutes()
         val request = OneTimeWorkRequestBuilder<RefreshWorker>()
             .setInitialDelay(delay.coerceIn(1L, 60L), TimeUnit.MINUTES)
             .build()
         WorkManager.getInstance(context).enqueueUniqueWork(
             UNIQUE_WORK_NAME,
-            ExistingWorkPolicy.APPEND_OR_REPLACE,
+            existingWorkPolicy,
             request,
         )
     }

@@ -68,6 +68,13 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(read("../src/ts/watch/health.ts"), /localStorage\.getItem/);
     assert.match(read("../src/ts/watch/health.ts"), /stepsStale: freshSteps === null/);
     assert.match(read("../src/ts/watch/health.ts"), /MAX_SAMPLES = 16/);
+    assert.ok(model.includes('focusCount: { value: "4 / 7"'), "Focus-count formatting must match the approved layout");
+    const companionConfig = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/config/CompanionConfig.kt");
+    assert.ok(!companionConfig.includes("or vector(0)"), "Missing Alertmanager series must not silently become zero");
+    const worker = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/data/RefreshWorker.kt");
+    assert.match(worker, /scheduleNext\(\)/);
+    assert.doesNotMatch(worker, /finally/);
+
 
 
 });

@@ -74,13 +74,18 @@ jobs:
           npm run enable-preview
           pebble build
 
-      - name: Install and capture emery screenshot
+      - name: Install and capture emery screenshot with startup logs
         run: |
           mkdir -p artifacts
           xvfb-run --auto-servernum --server-args="-screen 0 1024x768x24" \
             sh -eu -c '
               pebble kill || true
               pebble wipe
+              PYTHONUNBUFFERED=1 pebble logs --emulator emery > artifacts/pebble-logs.txt 2>&1 &
+              log_pid=$!
+              trap "kill $log_pid 2>/dev/null || true; wait $log_pid 2>/dev/null || true" EXIT
+              # The log command may boot the emulator itself; do not race its startup.
+              sleep 20
               pebble install --emulator emery
               sleep 3
               pebble screenshot --no-open --emulator emery artifacts/screenshot_emery.png
@@ -91,7 +96,6 @@ jobs:
         if: always()
         run: |
           mkdir -p artifacts
-          timeout 8s pebble logs --emulator emery > artifacts/pebble-logs.txt 2>&1 || true
           pebble sdk list > artifacts/pebble-sdk-list.txt 2>&1 || true
           pebble --version > artifacts/pebble-tool-version.txt 2>&1 || true
 
