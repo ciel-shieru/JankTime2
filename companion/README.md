@@ -21,4 +21,4 @@ Do not add a PebbleKit JS entrypoint to this watch project. RePebble documents t
 
 The watch receives display values, selected icon identifiers, timestamps, freshness flags, at most two focus items, at most two calendar events, a bounded heart-rate sample set, and an optional already-downscaled image. It must never receive provider URLs containing credentials, bearer tokens, private certificates, or raw task/calendar records beyond the displayed fields.
 
-All native APIs and inter-app contracts must be checked against current Android and RePebble documentation before implementation. Follow the Wakey export contract in docs/integrations/wakey-sitizen.md.
+All native APIs and inter-app contracts must be checked against current Android and RePebble documentation before implementation. Follow the Wakey export contract in docs/integrations/wakey-sitizen.md. Use the fixed-key AppMessage protocol described in docs/integrations/appmessage-protocol.md; named keys map to numeric PebbleKit Android 2 dictionary IDs in package.json array order.

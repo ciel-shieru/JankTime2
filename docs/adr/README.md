@@ -12,3 +12,5 @@ Accepted decisions are numbered and versioned. A changed decision requires a new
 - ADR-0008 — CI, emulator screenshot artifact, and reproducible checks.
 
 - ADR-0009 — Pixel font and Poco renderer for the approved high-density layout.
+
+- ADR-0010 — Bounded AppMessage protocol between the watch renderer and native companion.

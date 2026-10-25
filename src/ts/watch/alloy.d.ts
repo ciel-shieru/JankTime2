@@ -4,41 +4,17 @@ declare interface AlloyScreen {
     readonly color: boolean;
     readonly round: boolean;
 }
-
 declare const screen: AlloyScreen;
-
-declare class Resource {
-    constructor(name: string);
-}
-
-declare interface PocoFont {
-    readonly height: number;
-    bitmap?: unknown;
-}
-
-declare interface AlloyWatchMinuteEvent {
-    readonly date: Date;
-}
-
-interface BatterySample {
-    readonly percent: number;
-}
-interface BatterySensor {
-    sample(): BatterySample;
-}
-
+declare class Resource { constructor(name: string); }
+declare interface PocoFont { readonly height: number; bitmap?: unknown; }
+declare interface AlloyWatchMinuteEvent { readonly date: Date; }
+interface BatterySample { readonly percent: number; }
+interface BatterySensor { sample(): BatterySample; }
 declare const watch: {
-    readonly connected: {
-        readonly app: boolean;
-        readonly pebblekit: boolean;
-    };
-    addEventListener(
-        type: "minutechange",
-        callback: (event: AlloyWatchMinuteEvent) => void,
-    ): void;
+    readonly connected: { readonly app: boolean; };
+    addEventListener(type: "minutechange", callback: (event: AlloyWatchMinuteEvent) => void): void;
     addEventListener(type: "connected" | "resize", callback: () => void): void;
 };
-
 declare module "commodetto/Poco" {
     class Poco {
         constructor(display: AlloyScreen);
@@ -58,20 +34,32 @@ declare module "commodetto/Poco" {
     }
     export default Poco;
 }
-
 declare module "commodetto/parseBMF" {
     function parseBMF(resource: Resource): PocoFont;
     export default parseBMF;
 }
-
 declare module "commodetto/parseRLE" {
     function parseRLE(resource: Resource): unknown;
     export default parseRLE;
 }
-
 declare module "embedded:sensor/Battery" {
     export default class Battery {
         constructor(options: { onSample?: (this: BatterySensor) => void });
         sample(): BatterySample;
     }
+}
+declare module "pebble/message" {
+    interface MessageOptions {
+        keys: string[];
+        onReadable?: (this: WatchMessage) => void;
+        onWritable?: (this: WatchMessage) => void;
+        onSuspend?: (this: WatchMessage) => void;
+    }
+    class WatchMessage {
+        constructor(options: MessageOptions);
+        read(): Map<string, string | number>;
+        write(message: Map<string, string | number>): void;
+        close(): void;
+    }
+    export default WatchMessage;
 }

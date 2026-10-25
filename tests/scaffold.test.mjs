@@ -27,6 +27,15 @@ test("design contract describes eleven metric slots and reserved image cell", ()
         assert.ok(model.includes('"' + slot + '"'), "Missing configurable slot " + slot);
     }
     assert.match(model, /function validateSlotConfiguration/);
+    const bridge = read("../src/ts/watch/bridge.ts");
+    assert.match(bridge, /pieces.length > 56/);
+    assert.match(bridge, /function validTime/);
+    assert.match(bridge, /function validSlot/);
+    assert.match(bridge, /function validMetric/);
+    assert.match(bridge, /phoneBattery/);
+    assert.match(bridge, /heartSamples/);
+    const pkg = JSON.parse(read("../package.json"));
+    assert.deepEqual(pkg.pebble.messageKeys, ["TYPE", "ID", "VALUE", "FLAGS", "EXTRA"]);
     assert.match(model, /function selectAlarmOrBedtime/);
     assert.match(model, /function clipByWidth/);
 });

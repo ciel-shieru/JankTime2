@@ -9,10 +9,10 @@ import {
     formatCalendarRow,
     formatFocusRow,
     formatTime24,
-    selectAlarmOrBedtime,
     type MetricId,
     type SlotId,
 } from "./model";
+import { displayState, setBridgeRedraw } from "./bridge";
 
 const render = new Poco(screen);
 const paper = render.makeColor(255, 255, 255);
@@ -29,14 +29,14 @@ function loadFont(size: number): PocoFont {
 const statusFont = loadFont(12);
 const valueFont = loadFont(16);
 const smallFont = loadFont(12);
-const clockFont = loadFont(42);
+const clockFont = loadFont(56);
 
 let lastDate = new Date();
 let watchBatteryPercent = 0;
 const slotConfiguration = { ...DEFAULT_SLOT_CONFIGURATION };
 
 // These are visual test fixtures only; provider integrations will replace them.
-const phoneBatteryPercent = 83;
+const previewPhoneBatteryPercent = 83;
 const previewAlarmAt = new Date();
 previewAlarmAt.setHours(7, 30, 0, 0);
 if (previewAlarmAt.getTime() <= Date.now()) previewAlarmAt.setDate(previewAlarmAt.getDate() + 1);
@@ -187,11 +187,13 @@ function drawMetricIcon(metric: MetricId, cx: number, cy: number, stale: boolean
     }
 }
 function drawMetric(slot: SlotId, cx: number, iconY: number, valueY: number, maxWidth: number): void {
-    const metric = slotConfiguration[slot];
+    const metric = displayState.slotConfiguration[slot];
     if (metric === "none") return;
     const item = PREVIEW_METRICS[metric];
-    drawMetricIcon(metric, cx, iconY, item.stale);
-    centered(clipped(item.value, valueFont, maxWidth), valueFont, black, cx, valueY);
+    const value = displayState.metricValues[metric] ?? item.value;
+    const stale = displayState.staleMetrics[metric] ?? item.stale;
+    drawMetricIcon(metric, cx, iconY, stale);
+    centered(clipped(value, valueFont, maxWidth), valueFont, black, cx, valueY);
 }
 function drawPlanet(): void {
     render.frameRoundRect(85, 56, 30, 30, blue, 1);
@@ -205,22 +207,24 @@ function drawPlanet(): void {
     line(101, 69, 106, 74, paper, 2);
 }
 function drawHeartRate(): void {
-    let minimum = heartSamples[0] ?? currentBpm;
+    const samples = displayState.heartSamples ?? heartSamples;
+    const bpm = displayState.currentBpm ?? currentBpm;
+    let minimum = samples[0] ?? bpm;
     let maximum = minimum;
-    for (const sample of heartSamples) {
+    for (const sample of samples) {
         minimum = Math.min(minimum, sample);
         maximum = Math.max(maximum, sample);
     }
     circle(8, 135, 4, blue); circle(14, 135, 4, blue);
     line(4, 136, 11, 144, blue, 2); line(18, 136, 11, 144, blue, 2);
-    render.drawText(String(currentBpm), valueFont, black, 22, 128);
+    render.drawText(String(bpm), valueFont, black, 22, 128);
     const left = 39, right = 159, top = 130, bottom = 143;
     const span = Math.max(1, maximum - minimum);
     let px = left;
-    let py = bottom - Math.round(((heartSamples[0] ?? minimum) - minimum) * (bottom - top) / span);
-    for (let i = 1; i < heartSamples.length; i++) {
-        const value = heartSamples[i] ?? minimum;
-        const x = left + Math.round(i * (right - left) / (heartSamples.length - 1));
+    let py = bottom - Math.round(((samples[0] ?? minimum) - minimum) * (bottom - top) / span);
+    for (let i = 1; i < samples.length; i++) {
+        const value = samples[i] ?? minimum;
+        const x = left + Math.round(i * (right - left) / (samples.length - 1));
         const y = bottom - Math.round((value - minimum) * (bottom - top) / span);
         line(px, py, x, y, blue);
         px = x; py = y;
@@ -229,12 +233,12 @@ function drawHeartRate(): void {
 }
 function drawRows(): void {
     const focus = [
-        formatFocusRow("09:30", "17:00", 2, "Submit lab report"),
-        formatFocusRow("13:00", "18:30", 1, "Review cluster alerts"),
+        displayState.focusRows[0] ?? formatFocusRow("09:30", "17:00", 2, "Submit lab report"),
+        displayState.focusRows[1] ?? formatFocusRow("13:00", "18:30", 1, "Review cluster alerts"),
     ];
     const events = [
-        formatCalendarRow("10:00", "Campus", "Systems lab"),
-        formatCalendarRow("15:30", "Home", "Model eval run"),
+        displayState.calendarRows[0] ?? formatCalendarRow("10:00", "Campus", "Systems lab"),
+        displayState.calendarRows[1] ?? formatCalendarRow("15:30", "Home", "Model eval run"),
     ];
     line(5, 147, 195, 147, black);
     render.drawText(clipped(focus[0] ?? "", smallFont, 190), smallFont, black, 6, 152);
@@ -245,18 +249,23 @@ function drawRows(): void {
 }
 function drawStatus(date: Date): void {
     render.drawText(labelDate(date), statusFont, black, 5, 3);
-    const selected = selectAlarmOrBedtime(previewAlarmAt, previewBedtimeAt);
-    if (selected.isBedtime) {
+    const selected = displayState.alarmTime === null
+        ? null
+        : { time: displayState.alarmTime, isBedtime: displayState.alarmIsBedtime };
+    const isBedtime = selected?.isBedtime ?? (
+        previewBedtimeAt !== null && previewBedtimeAt.getTime() < previewAlarmAt.getTime()
+    );
+    if (isBedtime) {
         circle(62, 9, 6, blue);
         circle(65, 6, 5, paper);
     } else {
         drawAlarm(62, 9, black);
     }
-    if (selected.time !== null) {
-        render.drawText(formatTime24(selected.time), statusFont, black, 71, 3);
-    }
-    drawBluetooth(111, 10, watch.connected.pebblekit && watch.connected.app ? blue : red);
-    drawBattery(126, 4, 32, phoneBatteryPercent, yellow);
+    render.drawText(selected?.time ?? formatTime24(previewAlarmAt), statusFont, black, 71, 3);
+    const phoneBluetoothConnected = displayState.phoneBluetoothConnected;
+    const bluetoothConnected = watch.connected.app && phoneBluetoothConnected !== false;
+    drawBluetooth(111, 10, bluetoothConnected ? blue : red);
+    drawBattery(126, 4, 32, displayState.phoneBatteryPercent ?? previewPhoneBatteryPercent, yellow);
     drawBattery(163, 4, 34, watchBatteryPercent, blue);
     line(5, 20, 195, 20, black);
 }
@@ -302,6 +311,7 @@ try {
     watchBatteryPercent = 0;
 }
 
+setBridgeRedraw(() => draw());
 watch.addEventListener("minutechange", draw);
 watch.addEventListener("connected", () => draw());
 watch.addEventListener("resize", () => draw());

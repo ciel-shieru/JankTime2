@@ -5,7 +5,8 @@
     "modules": {
         "*": [
             "./main",
-            "./model"
+            "./model",
+            "./bridge"
         ]
     },
     "resources": {
@@ -14,25 +15,35 @@
                 "source": "./assets/Jersey10-Regular",
                 "size": 10,
                 "monochrome": true,
-                "blocks": ["Basic Latin"]
+                "blocks": [
+                    "Basic Latin"
+                ]
             },
             {
                 "source": "./assets/Jersey10-Regular",
                 "size": 12,
                 "monochrome": true,
-                "blocks": ["Basic Latin"]
+                "blocks": [
+                    "Basic Latin"
+                ]
             },
             {
                 "source": "./assets/Jersey10-Regular",
                 "size": 16,
                 "monochrome": true,
-                "blocks": ["Basic Latin", "Latin-1 Supplement"]
+                "blocks": [
+                    "Basic Latin",
+                    "Latin-1 Supplement"
+                ]
             },
             {
                 "source": "./assets/Jersey10-Regular",
-                "size": 42,
+                "size": 56,
                 "monochrome": true,
-                "blocks": ["Basic Latin", "Latin-1 Supplement"]
+                "blocks": [
+                    "Basic Latin",
+                    "Latin-1 Supplement"
+                ]
             }
         ]
     }
