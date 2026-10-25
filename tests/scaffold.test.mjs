@@ -42,8 +42,8 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(workflow, /check_screenshot\.py/);
     const boot = read("../src/c/mdbl.c");
     assert.match(boot, /ModdableCreationRecord/);
-    assert.match(boot, /\.slot = 36864/);
-    assert.match(boot, /\.chunk = 28672/);
+    assert.match(boot, /\.slot = 31744/);
+    assert.match(boot, /\.chunk = 19456/);
 });
 
 test("all accepted architecture decisions are present", () => {
