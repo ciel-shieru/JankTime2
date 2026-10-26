@@ -55,7 +55,8 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(manifest.modules["*"].includes("./mdi-icons"), "The MDI mask module must be included in the embedded watch build.");
     const renderer = read("../src/ts/watch/main.ts");
     assert.match(renderer, /new render\.Font\(bold \? "Gothic-Bold" : "Gothic-Regular", size\)/);
-    assert.match(renderer, /systemFont\(14\)/);
+    assert.match(renderer, /const statusFont = systemFont\(14\);/);
+    assert.match(renderer, /const valueFont = systemFont\(14, true\);/, "Metric values must use the bold font variant.");
     assert.match(renderer, /systemFont\(9\)/);
     assert.ok(renderer.includes('new render.Font("Leco-Bold", 36)'), "Clock must use the 36px Leco bold-numbers system font");
     assert.match(renderer, /centered\(formatTime24\(lastDate\), clockFont, black, 100, 135\)/);
@@ -68,7 +69,7 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(iconLines.every((line) => line.split('"')[3]?.length === 64), "Each MDI glyph must be a bounded 16×16 mask");
     assert.ok(renderer.includes("function drawMdiGlyph"));
     assert.ok(renderer.includes("function weatherIcon"));
-    assert.ok(renderer.includes('"battery-outline", width, height'), "Battery glyph must use the horizontal MDI outline mask.");
+    assert.match(renderer, /"battery-outline", width, \(height\s*\*\s*1\.25\)/, "Battery glyph must use the enlarged horizontal MDI outline mask.");
     assert.ok(renderer.includes('PREVIEW_MODE ? (displayState.weatherCondition ?? "partlycloudy")'), "Preview should use a real MDI weather condition.");
     assert.ok(renderer.includes('case "focusCount": icon = "check-circle-outline"'));
     assert.ok(renderer.includes('drawMdiGlyph(11, 141, heartColor, "heart", 14, 14)'));
