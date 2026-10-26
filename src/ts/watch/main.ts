@@ -124,7 +124,7 @@ function drawAlarm(cx: number, cy: number, color: unknown): void {
     drawMdiGlyph(cx, cy, color, "alarm", 10, 10);
 }
 function drawBluetooth(cx: number, cy: number, color: unknown): void {
-    drawMdiGlyph(cx, cy, color, "bluetooth", 10, 13);
+    drawMdiGlyph(cx, cy, color, "bluetooth", 8 * 1.25, 10 * 1.25);
 }
 function drawBattery(cx: number, cy: number, width: number, height: number, percent: number | null, color: unknown): void {
     drawMdiGlyph(cx, cy, color, "battery-outline", width, height);
@@ -279,16 +279,16 @@ function drawStatus(date: Date): void {
         ? displayState.alarmIsBedtime
         : PREVIEW_MODE && previewBedtimeAt !== null && previewBedtimeAt.getTime() < previewAlarmAt.getTime();
 
-    // MDI battery outline inner dimensions are approximately 9/16 width by 6/16 height.
+    // MDI battery outline's clear body is approximately 8/16 width by 6/16 height.
     // Size from the widest valid percentage at statusFont, with 1px padding.
     const batteryTextWidth = render.getTextWidth("100", statusFont);
-    const batteryWidth = Math.ceil((batteryTextWidth + 2) * 16 / 9);
+    const batteryWidth = Math.ceil((batteryTextWidth + 2) * 16 / 8);
     const batteryHeight = Math.ceil((statusFont.height + 2) * 16 / 6);
-    const rightBatteryCx = Math.floor(render.width - 3 - batteryWidth * 7 / 16);
-    const leftBatteryCx = rightBatteryCx - batteryWidth - 3;
+    const rightBatteryCx = Math.floor(render.width - 1 - batteryWidth * 7 / 16);
+    const leftBatteryCx = rightBatteryCx - batteryWidth - 2;
     const bluetoothCenterX = Math.floor(leftBatteryCx - batteryWidth * 7 / 16 - 4);
-    const alarmCenterX = bluetoothCenterX - 9;
-    const timeRight = alarmCenterX - 7;
+    const alarmCenterX = bluetoothCenterX - 7;
+    const timeRight = alarmCenterX - 6;
     const timeLeft = timeRight - render.getTextWidth(alarmTime, statusFont);
     const alarmColor = alarmTime === "--:--" ? red : black;
 
