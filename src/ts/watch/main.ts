@@ -9,8 +9,8 @@ import {
     type MetricId,
     type SlotId,
 } from "./model";
-import { displayState, setBridgeRedraw } from "./bridge";
-import { PREVIEW_MODE } from "./config";
+import { displayState, receiverDiagnostics, setBridgeRedraw } from "./bridge";
+import { DIAGNOSTIC_MODE, PREVIEW_MODE } from "./config";
 import { MDI_ICON_MASKS, type MdiIconName } from "./mdi-icons";
 import { formatSleepMinutes, formatSteps, readHealthSnapshot, type NativeHealthSnapshot } from "./health";
 
@@ -293,11 +293,64 @@ function drawStatus(date: Date): void {
     drawBattery(172, 4, 26, watchBatteryPercent, blue);
     line(5, 20, 195, 20, black);
 }
+function drawReceiverDiagnostics(): void {
+    const diagnosticSlot: SlotId = "grid.top.1";
+    const state = receiverDiagnostics;
+    const detail = state.lastDetail.length > 0 ? " (" + state.lastDetail + ")" : "";
+
+    centeredAtY("JANKTIME2 RX DEBUG", statusFont, black, 100, 14);
+    line(5, 25, 195, 25, black);
+    drawBaseline(
+        "RX: " + String(state.messagesReceived) + "  redraws: " + String(state.redrawInvocations),
+        smallFont, blue, 6, 41,
+    );
+    drawBaseline(
+        "Last: " + state.lastType + " / " + state.lastId,
+        smallFont, black, 6, 58,
+    );
+    drawBaseline("Outcome: " + state.lastOutcome + detail, smallFont, black, 6, 75);
+    line(5, 82, 195, 82, yellow, 2);
+    drawBaseline(
+        "Redraw handler: " + (state.redrawHandlerRegistered ? "registered" : "missing"),
+        smallFont, black, 6, 100,
+    );
+    drawBaseline("Target slot: " + diagnosticSlot, smallFont, black, 6, 117);
+    drawBaseline(
+        "Current mapping: " + displayState.slotConfiguration[diagnosticSlot],
+        statusFont, black, 6, 137,
+    );
+    drawBaseline(
+        "Last slot: " + (state.lastSlot ?? "--"),
+        smallFont, black, 6, 154,
+    );
+    drawBaseline(
+        "Mapping: " + (state.lastPreviousMetric ?? "--") + " -> " + (state.lastMetric ?? "--"),
+        smallFont, black, 6, 171,
+    );
+    drawBaseline(
+        "Slots applied: " + String(state.slotUpdatesApplied) +
+            "  rejected: " + String(state.messagesRejected),
+        smallFont, blue, 6, 188,
+    );
+    drawBaseline(
+        "Handler errors: " + String(state.handlerErrors) +
+            "  last redraw: " + (state.lastRedrawInvoked ? "yes" : "no"),
+        smallFont, black, 6, 205,
+    );
+    line(5, 209, 195, 209, black);
+    drawBaseline("Set grid.top.1 to None, then Save.", smallFont, yellow, 6, 222);
+}
+
 function draw(event?: AlloyWatchMinuteEvent): void {
     lastDate = event?.date ?? lastDate;
     refreshHealthForMinute(lastDate);
     render.begin();
     render.fillRectangle(paper, 0, 0, render.width, render.height);
+    if (DIAGNOSTIC_MODE) {
+        drawReceiverDiagnostics();
+        render.end();
+        return;
+    }
     drawStatus(lastDate);
 
     const rowOne = [
