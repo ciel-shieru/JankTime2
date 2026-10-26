@@ -1,5 +1,6 @@
 package com.cielshieru.janktime2.data
 
+import com.cielshieru.janktime2.config.CompanionConfig
 import com.cielshieru.janktime2.network.MindwtrTask
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -27,6 +28,45 @@ class SnapshotAndTaskTest {
             .markStale(listOf("cpuUsage"))
         assertEquals("10%", snapshot.metricValues["cpuUsage"])
         assertTrue("cpuUsage" in snapshot.staleMetrics)
+    }
+
+    @Test
+    fun climateMetricCanBeConfiguredWithoutFanOrWaterEntities() {
+        val config = CompanionConfig(climateEntity = "climate.living_room")
+        assertEquals(listOf("haClimateValue"), configuredHomeAssistantMetrics(config))
+    }
+
+    @Test
+    fun taskRowsUseDatesWhenTimesAreMissingOrMidnight() {
+        val task = MindwtrTask(
+            id = "date-only",
+            title = "Review",
+            status = "next",
+            priority = "medium",
+            startTime = "2026-10-26",
+            dueDate = "2026-10-27",
+            focusedToday = true,
+        )
+        assertTrue(task.row().startsWith("26/10 | 27/10 | !! |"))
+        val midnightTask = task.copy(
+            startTime = "2026-10-26T00:00:00",
+            dueDate = "2026-10-27T00:00:00",
+        )
+        assertTrue(midnightTask.row().startsWith("26/10 | 27/10 | !! |"))
+    }
+
+    @Test
+    fun taskRowsShowDatesAndTimesWhenTimedTaskSpansDays() {
+        val task = MindwtrTask(
+            id = "spanning-task",
+            title = "Travel",
+            status = "next",
+            priority = "high",
+            startTime = "2026-10-26T13:00:00",
+            dueDate = "2026-10-27T15:30:00",
+            focusedToday = true,
+        )
+        assertTrue(task.row().startsWith("26/10 13:00 | 27/10 15:30 | !!! |"))
     }
 
     @Test

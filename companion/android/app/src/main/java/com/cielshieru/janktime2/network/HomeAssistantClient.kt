@@ -8,11 +8,18 @@ data class HomeAssistantState(
     val entityId: String,
     val state: String,
     val attributes: JSONObject,
+    val translatedState: String? = null,
+)
+
+internal data class HomeAssistantForecast(
+    val apparentTemperature: Double?,
+    val temperature: Double?,
+    val rainChancePercent: Int?,
 )
 
 data class HomeAssistantWeather(
     val condition: String,
-    val feelsLikeTemperature: Double?,
+    val displayTemperature: Double?,
     val rainChancePercent: Int?,
 )
 
@@ -25,32 +32,25 @@ class HomeAssistantClient {
             bearerToken = token,
         )
         if (json.optString("entity_id") != entityId) throw IllegalArgumentException("Home Assistant returned an unexpected entity.")
-        val state = json.optString("state", "").take(256)
+        // Standard HA REST state is raw text; accept nested raw/translated data too.
+        val stateField = json.opt("state")
+        val rawState = if (stateField is JSONObject) stateField.optString("raw", "") else json.optString("state", "")
+        val nestedTranslated = if (stateField is JSONObject) stateField.optString("translated", "") else ""
+        val translated = nestedTranslated.ifBlank { json.optString("state_translated", "") }
+            .takeIf { it.isNotBlank() && it != "null" }
+            ?.take(64)
         val attributes = json.optJSONObject("attributes") ?: JSONObject()
-        return HomeAssistantState(entityId, state, attributes)
+        return HomeAssistantState(entityId, rawState.take(256), attributes, translated)
     }
 
     fun fetchWeather(baseUrl: String, token: String, entityId: String): HomeAssistantWeather {
         val current = fetchState(baseUrl, token, entityId)
-        val condition = current.state.lowercase().take(40)
-        val currentApparent = numericAttribute(current.attributes, "apparent_temperature")
         val forecast = runCatching { fetchFirstForecast(baseUrl, token, entityId) }.getOrNull()
-        return HomeAssistantWeather(
-            condition = condition,
-            feelsLikeTemperature = currentApparent ?: forecast?.first,
-            rainChancePercent = forecast?.second,
-        )
+        return weatherFromState(current, forecast)
     }
 
-    /**
-     * Home Assistant's weather.get_forecasts action returns
-     * service_response[entity_id].forecast. Integrations can omit optional fields.
-     */
-    private fun fetchFirstForecast(
-        baseUrl: String,
-        token: String,
-        entityId: String,
-    ): Pair<Double?, Int?>? {
+    /** Home Assistant's weather.get_forecasts action returns service_response[entity_id].forecast. */
+    private fun fetchFirstForecast(baseUrl: String, token: String, entityId: String): HomeAssistantForecast? {
         validateEntityId(entityId)
         val response = SecureHttp.requestJson(
             baseUrl = baseUrl,
@@ -65,35 +65,52 @@ class HomeAssistantClient {
         val entityResponse = serviceResponse.optJSONObject(entityId)
             ?: throw IllegalArgumentException("Home Assistant forecast response does not contain the selected entity.")
         val forecasts = entityResponse.optJSONArray("forecast") ?: return null
+
+        var apparentTemperature: Double? = null
+        var temperature: Double? = null
+        var rainChancePercent: Int? = null
         for (i in 0 until minOf(forecasts.length(), 48)) {
             val item = forecasts.optJSONObject(i) ?: continue
-            val apparent = numericValue(item.opt("apparent_temperature"))
-            val probability = numericValue(item.opt("precipitation_probability"))
-                ?.takeIf { it in 0.0..100.0 }
-                ?.roundToInt()
-            if (apparent != null || probability != null) return apparent to probability
+            if (apparentTemperature == null) apparentTemperature = numericValue(item.opt("apparent_temperature"))
+            if (temperature == null) temperature = numericValue(item.opt("temperature"))
+            if (rainChancePercent == null) {
+                rainChancePercent = numericValue(item.opt("precipitation_probability"))
+                    ?.takeIf { it in 0.0..100.0 }
+                    ?.roundToInt()
+            }
+            if (apparentTemperature != null && temperature != null && rainChancePercent != null) break
         }
-        return null
+        if (apparentTemperature == null && temperature == null && rainChancePercent == null) return null
+        return HomeAssistantForecast(apparentTemperature, temperature, rainChancePercent)
     }
 
     fun climateDisplayValue(baseUrl: String, token: String, entityId: String, attribute: String): String? {
         val state = fetchState(baseUrl, token, entityId)
-        if (attribute == "state") return state.state.takeIf { it.isNotBlank() }?.take(32)
-        require(attribute.matches(Regex("[a-zA-Z_][a-zA-Z0-9_]{0,63}"))) {
-            "Climate attribute name is invalid."
-        }
-        val value = state.attributes.opt(attribute) ?: return null
-        if (value is JSONObject || value is JSONArray || value == JSONObject.NULL) return null
-        return value.toString().filterNot { it.isISOControl() }.take(32).ifBlank { null }
+        val translated = if (attribute.isBlank()) {
+            // The REST endpoint returns raw IDs. Try state_translated via the template API;
+            // if the endpoint/policy disallows it, the pure helper falls back to raw state.
+            runCatching { fetchTranslatedState(baseUrl, token, entityId) }.getOrNull()
+        } else null
+        return resolveClimateDisplayValue(state, attribute, translated)
+    }
+
+    private fun fetchTranslatedState(baseUrl: String, token: String, entityId: String): String? {
+        validateEntityId(entityId)
+        val template = """{{ {"translated": state_translated("$entityId")} | to_json }}"""
+        val response = SecureHttp.requestJson(
+            baseUrl = baseUrl,
+            pathSegments = listOf("api", "template"),
+            bearerToken = token,
+            method = "POST",
+            jsonBody = JSONObject().put("template", template),
+        )
+        return response.optString("translated", "").take(64).ifBlank { null }
     }
 
     fun sensorValue(baseUrl: String, token: String, entityId: String): String? {
         val state = fetchState(baseUrl, token, entityId)
         return state.state.takeIf { it.isNotBlank() && it.length <= 32 }
     }
-
-    private fun numericAttribute(attributes: JSONObject, name: String): Double? =
-        numericValue(attributes.opt(name))
 
     private fun numericValue(value: Any?): Double? {
         val number = when (value) {
@@ -110,3 +127,42 @@ class HomeAssistantClient {
         }
     }
 }
+
+internal fun weatherFromState(current: HomeAssistantState, forecast: HomeAssistantForecast?): HomeAssistantWeather {
+    val apparentTemperature = numericValueInRange(current.attributes.opt("apparent_temperature"))
+    val currentTemperature = numericValueInRange(current.attributes.opt("temperature"))
+    return HomeAssistantWeather(
+        condition = current.state.lowercase().take(40),
+        // Many integrations omit apparent_temperature but do expose current temperature.
+        displayTemperature = apparentTemperature ?: forecast?.apparentTemperature
+            ?: currentTemperature ?: forecast?.temperature,
+        rainChancePercent = forecast?.rainChancePercent,
+    )
+}
+
+internal fun resolveClimateDisplayValue(state: HomeAssistantState, attribute: String, translatedState: String? = null): String? {
+    if (attribute.isBlank()) {
+        return cleanClimateDisplayValue(translatedState ?: state.translatedState ?: state.state)
+    }
+    if (attribute == "state") return cleanClimateDisplayValue(state.state)
+    require(attribute.matches(Regex("[a-zA-Z_][a-zA-Z0-9_]{0,63}"))) {
+        "Climate attribute name is invalid."
+    }
+    val value = state.attributes.opt(attribute) ?: return null
+    if (value is JSONObject || value is JSONArray || value == JSONObject.NULL) return null
+    return cleanClimateDisplayValue(value.toString())
+}
+
+private fun numericValueInRange(value: Any?): Double? {
+    val number = when (value) {
+        is Number -> value.toDouble()
+        is String -> value.toDoubleOrNull()
+        else -> null
+    }
+    return number?.takeIf { it.isFinite() && it in -100.0..100.0 }
+}
+
+private fun cleanClimateDisplayValue(value: String?): String? =
+    value?.filterNot { it.isISOControl() || it.code in 0x202a..0x202e || it.code in 0x2066..0x2069 }
+        ?.take(32)
+        ?.ifBlank { null }

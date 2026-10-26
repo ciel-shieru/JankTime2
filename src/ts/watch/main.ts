@@ -124,13 +124,12 @@ function drawAlarm(cx: number, cy: number, color: unknown): void {
     drawMdiGlyph(cx, cy, color, "alarm", 10, 10);
 }
 function drawBluetooth(cx: number, cy: number, color: unknown): void {
-    drawMdiGlyph(cx, cy, color, "bluetooth", 8, 10);
+    drawMdiGlyph(cx, cy, color, "bluetooth", 10, 13);
 }
-function drawBattery(x: number, y: number, width: number, percent: number | null, color: unknown): void {
-    const height = 12;
-    drawMdiGlyph(x + Math.floor(width / 2), y + Math.floor(height / 2), color, "battery-outline", width, (height*1.25));
+function drawBattery(cx: number, cy: number, width: number, height: number, percent: number | null, color: unknown): void {
+    drawMdiGlyph(cx, cy, color, "battery-outline", width, height);
     const safe = percent === null ? null : Math.max(0, Math.min(100, Math.trunc(percent)));
-    centeredAtY(safe === null ? "--" : String(safe), smallFont, black, x + Math.floor(width / 2), y + Math.floor(height / 2));
+    centeredAtY(safe === null ? "--" : String(safe), statusFont, black, cx, cy);
 }
 function drawMetricIcon(metric: MetricId, cx: number, cy: number, stale: boolean): void {
     const color = stale ? red : blue;
@@ -279,19 +278,30 @@ function drawStatus(date: Date): void {
     const bedtime = displayState.alarmTime !== null
         ? displayState.alarmIsBedtime
         : PREVIEW_MODE && previewBedtimeAt !== null && previewBedtimeAt.getTime() < previewAlarmAt.getTime();
-    const timeRight = 116;
+
+    // MDI battery outline inner dimensions are approximately 9/16 width by 6/16 height.
+    // Size from the widest valid percentage at statusFont, with 1px padding.
+    const batteryTextWidth = render.getTextWidth("100", statusFont);
+    const batteryWidth = Math.ceil((batteryTextWidth + 2) * 16 / 9);
+    const batteryHeight = Math.ceil((statusFont.height + 2) * 16 / 6);
+    const rightBatteryCx = Math.floor(render.width - 3 - batteryWidth * 7 / 16);
+    const leftBatteryCx = rightBatteryCx - batteryWidth - 3;
+    const bluetoothCenterX = Math.floor(leftBatteryCx - batteryWidth * 7 / 16 - 4);
+    const alarmCenterX = bluetoothCenterX - 9;
+    const timeRight = alarmCenterX - 7;
     const timeLeft = timeRight - render.getTextWidth(alarmTime, statusFont);
     const alarmColor = alarmTime === "--:--" ? red : black;
-    if (bedtime) drawMdiGlyph(timeRight + 8, statusCenterY, blue, "moon-waning-crescent", 10, 10);
-    else drawAlarm(timeRight + 8, statusCenterY, alarmColor);
+
+    if (bedtime) drawMdiGlyph(alarmCenterX, statusCenterY, blue, "moon-waning-crescent", 10, 10);
+    else drawAlarm(alarmCenterX, statusCenterY, alarmColor);
     drawTextCenteredAtY(alarmTime, statusFont, black, timeLeft, statusCenterY);
 
-    // The PebbleKit connection is the authoritative live phone/watch connection state.
-    // Keep a narrow, consistent 3px gap across the right-justified status cluster.
-    drawBluetooth(136, statusCenterY, watch.connected.app ? blue : red);
-    drawBattery(143, 4, 26, displayState.phoneBatteryPercent ?? (PREVIEW_MODE ? previewPhoneBatteryPercent : null), yellow);
-    drawBattery(172, 4, 26, watchBatteryPercent, blue);
-    line(5, 20, 195, 20, black);
+    // Right-justify the batteries, Bluetooth, alarm and time as a compact status cluster.
+    drawBluetooth(bluetoothCenterX, statusCenterY, watch.connected.app ? blue : red);
+    drawBattery(leftBatteryCx, statusCenterY, batteryWidth, batteryHeight,
+        displayState.phoneBatteryPercent ?? (PREVIEW_MODE ? previewPhoneBatteryPercent : null), yellow);
+    drawBattery(rightBatteryCx, statusCenterY, batteryWidth, batteryHeight, watchBatteryPercent, blue);
+    line(5, 20, render.width - 5, 20, black);
 }
 function draw(event?: AlloyWatchMinuteEvent): void {
     lastDate = event?.date ?? lastDate;

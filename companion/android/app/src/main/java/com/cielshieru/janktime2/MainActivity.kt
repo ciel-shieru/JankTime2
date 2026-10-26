@@ -374,13 +374,16 @@ private fun CompanionSettingsScreen(
         TextInput("HTTPS base URL", config.homeAssistantUrl, { config = config.copy(homeAssistantUrl = it) })
         SecretInput("Long-lived access token", secrets.homeAssistant, { secrets = secrets.copy(homeAssistant = it) })
         TextInput("Sensor entity (fan state)", config.sensorEntity, { config = config.copy(sensorEntity = it) })
+        Text("Optional. Its current state populates the fan-state metric (grid.top.5 by default). It is independent of the climate metric.", style = MaterialTheme.typography.bodySmall)
         TextInput("Generic Home Assistant sensor entity (optional)", config.genericSensorEntity, {
             config = config.copy(genericSensorEntity = it)
         })
         TextInput("Water sensor entity", config.waterEntity, { config = config.copy(waterEntity = it) })
+        Text("Optional. Its current state populates the water metric (clock.right by default). It does not enable or configure the climate metric.", style = MaterialTheme.typography.bodySmall)
         TextInput("Weather entity", config.weatherEntity, { config = config.copy(weatherEntity = it) })
         TextInput("Climate entity", config.climateEntity, { config = config.copy(climateEntity = it) })
-        TextInput("Climate attribute (or state)", config.climateAttribute, { config = config.copy(climateAttribute = it) })
+        TextInput("Climate attribute (blank = translated state)", config.climateAttribute, { config = config.copy(climateAttribute = it) })
+        Text("Leave this blank to display Home Assistant's translated climate state. The climate entity refreshes independently of fan and water sensors.", style = MaterialTheme.typography.bodySmall)
         NumberInput("Home Assistant refresh minutes (1–60)", config.refreshHomeAssistantMinutes, {
             config = config.copy(refreshHomeAssistantMinutes = it)
         })
@@ -433,6 +436,17 @@ private fun CompanionSettingsScreen(
                 Text(calendar.displayName.take(100))
             }
         }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(
+                checked = config.calendarTodayOnly,
+                onCheckedChange = { checked -> config = config.copy(calendarTodayOnly = checked) },
+            )
+            Text("Only show today's next 2 events")
+        }
+        Text(
+            "On: only upcoming events today, without a date. Off (default): upcoming events over the next 7 days with DD/MM HH:mm.",
+            style = MaterialTheme.typography.bodySmall,
+        )
         TextInput(
             "Calendar regex blocklist (one pattern per line)",
             config.calendarBlocklist.joinToString("\n"),

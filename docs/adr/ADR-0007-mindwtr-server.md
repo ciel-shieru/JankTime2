@@ -22,7 +22,7 @@ Persist a local, date-scoped set of opaque task IDs observed while their isFocus
 
 The total is necessarily best-effort if JankTime2 was not running when a task was focused, or a task was completed between polls before the companion observed it. The UI/docs must state this limitation; only a Mindwtr-provided focus-history field or explicit upstream event/export API can provide an exact total in every case. Do not fabricate the missing history.
 
-Use only the two next focused items, sorted by parsed start time then due time. Render 24-hour HH:mm and priority marks (low = !, medium = !!, high = !!!, urgent = !!!!); hard-clip overflow without an ellipsis. Refresh every 5 minutes by default, configurable from 1 through 60 minutes. Cache the validated provider snapshot, reuse last-known-good data on failure, and mark affected metrics stale/red under ADR-0004.
+Use only the two next focused items, sorted by parsed start time then due time. Render 24-hour HH:mm and priority marks (low = !, medium = !!, high = !!!, urgent = !!!!); hard-clip overflow without an ellipsis. If both times are missing or 00:00, render start and due dates as DD/MM without times. If non-midnight start and due times land on different local dates, render both as DD/MM HH:mm; otherwise retain HH:mm-only values. Refresh every 5 minutes by default, configurable from 1 through 60 minutes. Cache the validated provider snapshot, reuse last-known-good data on failure, and mark affected metrics stale/red under ADR-0004.
 
 ## Consequences
 

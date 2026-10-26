@@ -11,7 +11,7 @@ data class CompanionConfig(
     val waterEntity: String = "",
     val weatherEntity: String = "",
     val climateEntity: String = "",
-    val climateAttribute: String = "temperature",
+    val climateAttribute: String = "",
     val prometheusUrl: String = "",
     val cpuQuery: String = "",
     val memoryQuery: String = "",
@@ -24,6 +24,7 @@ data class CompanionConfig(
     val metricSlots: Map<String, String> = DEFAULT_SLOTS,
     val selectedCalendarIds: Set<String> = emptySet(),
     val calendarBlocklist: List<String> = emptyList(),
+    val calendarTodayOnly: Boolean = false,
 ) {
     companion object {
         val DEFAULT_SLOTS = mapOf(
@@ -74,7 +75,7 @@ object ConfigStore {
             waterEntity = prefs.getString("ha.water_entity", "").orEmpty(),
             weatherEntity = prefs.getString("ha.weather_entity", "").orEmpty(),
             climateEntity = prefs.getString("ha.climate_entity", "").orEmpty(),
-            climateAttribute = prefs.getString("ha.climate_attribute", "temperature").orEmpty(),
+            climateAttribute = prefs.getString("ha.climate_attribute", "").orEmpty(),
             prometheusUrl = prefs.getString("prom.url", "").orEmpty(),
             cpuQuery = prefs.getString("prom.cpu_query", "").orEmpty(),
             memoryQuery = prefs.getString("prom.memory_query", "").orEmpty(),
@@ -87,6 +88,7 @@ object ConfigStore {
             metricSlots = slotMap,
             selectedCalendarIds = selectedIds,
             calendarBlocklist = filters,
+            calendarTodayOnly = prefs.getBoolean("calendar.today_only", false),
         )
     }
 
@@ -110,6 +112,7 @@ object ConfigStore {
             .putString("ha.weather_entity", checked.weatherEntity.trim())
             .putString("ha.climate_entity", checked.climateEntity.trim())
             .putString("ha.climate_attribute", checked.climateAttribute.trim())
+            .putBoolean("calendar.today_only", checked.calendarTodayOnly)
             .putString("prom.url", checked.prometheusUrl.trim())
             .putString("prom.cpu_query", checked.cpuQuery.trim())
             .putString("prom.memory_query", checked.memoryQuery.trim())

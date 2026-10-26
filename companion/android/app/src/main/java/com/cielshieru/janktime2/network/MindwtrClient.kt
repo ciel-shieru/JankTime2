@@ -8,6 +8,8 @@ import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
+import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
@@ -20,10 +22,17 @@ private fun parseMindwtrInstant(raw: String?): Instant? {
     return null
 }
 
-private fun formatMindwtrTime(raw: String?): String {
-    val instant = parseMindwtrInstant(raw) ?: return "--:--"
-    return DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault()).format(instant)
-}
+private fun parseMindwtrDateTime(raw: String?): ZonedDateTime? =
+    parseMindwtrInstant(raw)?.atZone(ZoneId.systemDefault())
+
+private fun formatMindwtrTime(value: ZonedDateTime?): String =
+    value?.format(DateTimeFormatter.ofPattern("HH:mm")) ?: "--:--"
+
+private fun formatMindwtrDate(value: ZonedDateTime?): String =
+    value?.format(DateTimeFormatter.ofPattern("dd/MM")) ?: "--"
+
+private fun formatMindwtrDateTime(value: ZonedDateTime?): String =
+    value?.format(DateTimeFormatter.ofPattern("dd/MM HH:mm")) ?: "--"
 
 private fun cleanMindwtrText(value: String, maxChars: Int): String =
     value.replace(Regex("[\\u0000-\\u001f\\u007f-\\u009f\\u202a-\\u202e\\u2066-\\u2069]"), "")
@@ -48,7 +57,30 @@ data class MindwtrTask(
             "urgent" -> "!!!!"
             else -> ""
         }
-        return formatMindwtrTime(startTime) + " | " + formatMindwtrTime(dueDate) + " | " + marks + " | " + cleanMindwtrText(title, 160)
+        val start = parseMindwtrDateTime(startTime)
+        val due = parseMindwtrDateTime(dueDate)
+        val startHasTime = start != null && start.toLocalTime() != LocalTime.MIDNIGHT
+        val dueHasTime = due != null && due.toLocalTime() != LocalTime.MIDNIGHT
+        val datesOnly = !startHasTime && !dueHasTime
+        val differentDatesWithTimes = start != null && due != null &&
+            start.toLocalDate() != due.toLocalDate() && startHasTime && dueHasTime
+        val startLabel: String
+        val dueLabel: String
+        when {
+            datesOnly -> {
+                startLabel = formatMindwtrDate(start)
+                dueLabel = formatMindwtrDate(due)
+            }
+            differentDatesWithTimes -> {
+                startLabel = formatMindwtrDateTime(start)
+                dueLabel = formatMindwtrDateTime(due)
+            }
+            else -> {
+                startLabel = formatMindwtrTime(start)
+                dueLabel = formatMindwtrTime(due)
+            }
+        }
+        return startLabel + " | " + dueLabel + " | " + marks + " | " + cleanMindwtrText(title, 160)
     }
 
     fun sortKey(): Pair<Long, Long> =

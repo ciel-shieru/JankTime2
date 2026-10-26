@@ -44,8 +44,8 @@ The eleven selectable metric slots are all rows in the table except grid.bottom.
 - Date: abbreviated weekday and month, with day number.
 - Every time: local 24-hour HH:mm, always zero-padded.
 - Clock: HH:mm only.
-- Focus line: start HH:mm | due HH:mm | priority marks | title.
-- Calendar line: start HH:mm | location (at most 10 characters) | title.
+- Focus line: start | due | priority marks | title. If both times are missing or 00:00, display start and due dates as DD/MM. If timed start and due values fall on different dates, display both as DD/MM HH:mm; otherwise display HH:mm.
+- Calendar line: start time | location (at most 10 characters) | title. The calendar option defaults off and displays the upcoming two events with DD/MM HH:mm. When “Only show today's next 2 events” is on, only events starting before local midnight are eligible and the date prefix is omitted (HH:mm).
 - Priority marks: display exclamation marks based on the chosen Mindwtr priority mapping.
 - When text is too long, hard-clip at the available width. Do not append an ellipsis.
 - Missing values use a bounded placeholder; stale values keep their last-known text but source icons turn red.

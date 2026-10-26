@@ -21,7 +21,7 @@ object ConfigBackupCodec {
         "homeAssistantUrl", "sensorEntity", "genericSensorEntity", "waterEntity", "weatherEntity",
         "climateEntity", "climateAttribute", "prometheusUrl", "cpuQuery", "memoryQuery", "alertQuery",
         "mindwtrUrl", "refreshHomeAssistantMinutes", "refreshPrometheusMinutes", "refreshMindwtrMinutes",
-        "refreshWakeyMinutes", "metricSlots", "selectedCalendarIds", "calendarBlocklist",
+        "refreshWakeyMinutes", "metricSlots", "selectedCalendarIds", "calendarBlocklist", "calendarTodayOnly",
     )
 
     fun encode(
@@ -58,6 +58,7 @@ object ConfigBackupCodec {
                 })
                 put("selectedCalendarIds", JSONArray(config.selectedCalendarIds.sorted()))
                 put("calendarBlocklist", JSONArray(RegexFilter.validate(config.calendarBlocklist)))
+                put("calendarTodayOnly", config.calendarTodayOnly)
             })
         if (secrets != null) {
             require(secrets.keys.all { it in secretNames }) { "Backup contains an unsupported secret field." }
@@ -141,6 +142,11 @@ object ConfigBackupCodec {
                 add(item)
             }
         }
+        val calendarTodayOnly = if (!c.has("calendarTodayOnly")) false else {
+            val value = c.opt("calendarTodayOnly")
+            require(value is Boolean) { "Invalid calendar today-only setting." }
+            value
+        }
         val config = CompanionConfig(
             homeAssistantUrl = string("homeAssistantUrl", max = 2048),
             sensorEntity = string("sensorEntity", max = 255),
@@ -161,6 +167,7 @@ object ConfigBackupCodec {
             metricSlots = slots,
             selectedCalendarIds = calendarIds,
             calendarBlocklist = RegexFilter.validate(filters),
+            calendarTodayOnly = calendarTodayOnly,
         )
         validateConfig(config)
 
@@ -222,7 +229,7 @@ object ConfigBackupCodec {
         validateHttpsUrl(config.homeAssistantUrl, "Home Assistant")
         validateHttpsUrl(config.prometheusUrl, "Prometheus")
         validateHttpsUrl(config.mindwtrUrl, "Mindwtr")
-        require(config.climateAttribute == "state" ||
+        require(config.climateAttribute.isBlank() || config.climateAttribute == "state" ||
             config.climateAttribute.matches(Regex("[a-zA-Z_][a-zA-Z0-9_]{0,63}"))) {
             "Climate attribute name is invalid."
         }

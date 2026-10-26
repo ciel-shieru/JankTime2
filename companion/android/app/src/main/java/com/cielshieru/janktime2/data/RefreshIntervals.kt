@@ -24,6 +24,17 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.flow.first
 import io.rebble.pebblekit2.client.DefaultPebbleInfoRetriever
 
+internal fun configuredHomeAssistantMetrics(config: CompanionConfig): List<String> = buildList {
+    if (config.sensorEntity.isNotBlank()) add("fanState")
+    if (config.genericSensorEntity.isNotBlank()) add("haSensor")
+    if (config.waterEntity.isNotBlank()) add("water")
+    if (config.weatherEntity.isNotBlank()) {
+        add("weatherFeelsLike")
+        add("rainChance")
+    }
+    if (config.climateEntity.isNotBlank()) add("haClimateValue")
+}
+
 class SnapshotRefresher(private val context: Context) {
     private val snapshotStore = WatchSnapshotStore(context)
     private val secrets = EncryptedSecretStore(context)
@@ -78,16 +89,7 @@ class SnapshotRefresher(private val context: Context) {
             snapshot = snapshot.attempted("homeAssistant", now)
             val base = config.homeAssistantUrl
             val token = credentials.get("home_assistant")
-            val configuredMetrics = buildList {
-                if (config.sensorEntity.isNotBlank()) add("fanState")
-                if (config.genericSensorEntity.isNotBlank()) add("haSensor")
-                if (config.waterEntity.isNotBlank()) add("water")
-                if (config.weatherEntity.isNotBlank()) {
-                    add("weatherFeelsLike")
-                    add("rainChance")
-                }
-                if (config.climateEntity.isNotBlank()) add("haClimateValue")
-            }
+            val configuredMetrics = configuredHomeAssistantMetrics(config)
 
             if (configuredMetrics.isEmpty() || base.isBlank() || token.isNullOrBlank()) {
                 SyncDiagnostics.warning(
@@ -148,7 +150,7 @@ class SnapshotRefresher(private val context: Context) {
                     try {
                         val weather = ha.fetchWeather(base, token, config.weatherEntity)
                         snapshot = snapshot.copy(weatherCondition = weather.condition)
-                        val feelsLike = weather.feelsLikeTemperature?.let { "%.0f°".format(it) }
+                        val feelsLike = weather.displayTemperature?.let { "%.0f°".format(it) }
                         val rainChance = weather.rainChancePercent?.let { "$it%" }
                         if (feelsLike != null) {
                             snapshot = snapshot.withMetric("weatherFeelsLike", feelsLike)
@@ -290,8 +292,15 @@ class SnapshotRefresher(private val context: Context) {
         if (due(snapshot, "calendar", 5) || forceRefresh) {
             snapshot = snapshot.attempted("calendar", now)
             try {
-                val events = CalendarReader(context).nextEvents(config.selectedCalendarIds, config.calendarBlocklist)
-                snapshot = snapshot.copy(calendarRows = listOf(events.getOrNull(0)?.displayRow(), events.getOrNull(1)?.displayRow()))
+                val events = CalendarReader(context).nextEvents(
+                    config.selectedCalendarIds,
+                    config.calendarBlocklist,
+                    onlyToday = config.calendarTodayOnly,
+                )
+                snapshot = snapshot.copy(calendarRows = listOf(
+                    events.getOrNull(0)?.displayRow(includeDate = !config.calendarTodayOnly),
+                    events.getOrNull(1)?.displayRow(includeDate = !config.calendarTodayOnly),
+                ))
                 snapshot = snapshot.succeeded("calendar", now)
             } catch (cancelled: CancellationException) {
                 throw cancelled

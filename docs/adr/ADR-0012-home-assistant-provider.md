@@ -19,8 +19,8 @@ Home Assistant is the sole weather provider and must also supply selectable sens
 Choose option 3. The companion calls the configured Home Assistant API over HTTPS using a user-provided, least-privilege token. Each HA-backed metric has its own entity ID, including a generic sensor metric, and the user selects the exact state/attribute for a climate value. No token, Authorization header, or raw entity response is sent through AppMessage or logged.
 
 The provider contract must account for integration-specific attributes:
-- map known Home Assistant weather condition strings through a fixed local icon table;
-- use an apparent/feels-like temperature when the selected entity exposes one;
+- map known Home Assistant raw weather condition strings (for example, `rainy`) through a fixed local icon table;
+- use an apparent/feels-like temperature when available, otherwise use the current `temperature` attribute as the display fallback;
 - use the documented forecast endpoint/action for precipitation probability rather than assuming all weather entities expose a current rain-chance attribute;
 - if a requested value is absent, render it as unavailable or use an explicitly labelled fallback; never silently fabricate it;
 - do not let provider data select arbitrary icon resources or executable paths.
@@ -31,7 +31,7 @@ Refresh defaults to 3 minutes, configurable from 1 to 60 minutes. Cache validate
 
 - Home Assistant access requires a configured server URL and token; the Home Assistant Android app need not expose its own private storage.
 - The phone must be able to reach the configured server (LAN, VPN, or the user's supported remote-access path) and validate its TLS certificate normally.
-- Entity IDs and climate attributes are user-selected configuration, not hard-coded identifiers.
+- Entity IDs and climate attributes are user-selected configuration, not hard-coded identifiers. A blank climate attribute requests `state_translated` through Home Assistant's template API, then falls back to any translated response value and finally raw state; an explicit `state` continues to show the raw state.
 - No other weather provider is implemented.
 
 ## References

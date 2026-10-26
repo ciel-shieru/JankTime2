@@ -20,7 +20,21 @@ data class CalendarEventRow(
     val title: String,
     val description: String,
 ) {
-    fun displayRow(): String = startTime + " | " + location.take(10) + " | " + title
+    fun displayRow(includeDate: Boolean = true): String {
+        val displayTime = if (includeDate) {
+            DateTimeFormatter.ofPattern("dd/MM HH:mm")
+                .withZone(ZoneId.systemDefault())
+                .format(Instant.ofEpochMilli(startMillis))
+        } else startTime
+        return displayTime + " | " + location.take(10) + " | " + title
+    }
+}
+
+internal fun calendarQueryEndMillis(nowMillis: Long, onlyToday: Boolean): Long {
+    if (!onlyToday) return nowMillis + 7L * 24L * 60L * 60L * 1000L
+    val zone = ZoneId.systemDefault()
+    return Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate().plusDays(1)
+        .atStartOfDay(zone).toInstant().toEpochMilli()
 }
 
 class CalendarReader(private val context: Context) {
@@ -53,6 +67,7 @@ class CalendarReader(private val context: Context) {
         selectedCalendarIds: Set<String>,
         rawPatterns: List<String>,
         nowMillis: Long = System.currentTimeMillis(),
+        onlyToday: Boolean = false,
     ): List<CalendarEventRow> {
         requirePermission()
         if (selectedCalendarIds.isEmpty()) return emptyList()
@@ -60,7 +75,7 @@ class CalendarReader(private val context: Context) {
         if (ids.isEmpty()) return emptyList()
 
         val patterns = RegexFilter.validate(rawPatterns).map(::Regex)
-        val endMillis = nowMillis + LOOK_AHEAD_MILLIS
+        val endMillis = calendarQueryEndMillis(nowMillis, onlyToday)
         val uri = CalendarContract.Instances.CONTENT_URI.buildUpon()
             .appendPath(nowMillis.toString())
             .appendPath(endMillis.toString())
@@ -116,6 +131,5 @@ class CalendarReader(private val context: Context) {
     companion object {
         private const val MAX_CALENDARS = 50
         private const val MAX_EVENTS_SCANNED = 400
-        private const val LOOK_AHEAD_MILLIS = 7L * 24L * 60L * 60L * 1000L
     }
 }

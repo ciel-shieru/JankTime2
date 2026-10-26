@@ -2,6 +2,7 @@ package com.cielshieru.janktime2.config
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CompanionConfigTest {
@@ -17,6 +18,22 @@ class CompanionConfigTest {
             runCatching { RefreshIntervals.validate(value) }
                 .onSuccess { throw AssertionError("Accepted invalid interval: " + value) }
         }
+    }
+
+    @Test
+    fun calendarTodayOnlyDefaultsOffAndSurvivesBackupRoundTrip() {
+        assertFalse(CompanionConfig().calendarTodayOnly)
+        assertEquals("", CompanionConfig().climateAttribute)
+        val enabled = CompanionConfig(calendarTodayOnly = true, climateAttribute = "")
+        val restored = ConfigBackupCodec.decode(ConfigBackupCodec.encode(enabled)).config
+        assertTrue(restored.calendarTodayOnly)
+        assertEquals("", restored.climateAttribute)
+
+        // Older schema-v1 backups that lack the optional field stay compatible.
+        val legacy = ConfigBackupCodec.decode(
+            """{"schemaVersion":1,"config":{"climateAttribute":""}}"""
+        ).config
+        assertFalse(legacy.calendarTodayOnly)
     }
 
     @Test
