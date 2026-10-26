@@ -1,4 +1,8 @@
 import Message from "pebble/message";
+
+// The Moddable XS watch runtime exposes console.log; this declaration keeps
+// the watch-only TypeScript config independent of browser/Node type libraries.
+declare const console: { log(message: string): void };
 import {
     DEFAULT_SLOT_CONFIGURATION,
     METRIC_IDS,
@@ -44,6 +48,13 @@ type MessageValue = string | number;
 type IncomingMessage = Map<string, MessageValue>;
 let redraw: (() => void) | null = null;
 
+const RECEIVER_LOG_PREFIX = "[JankTime2Receiver]";
+
+function receiverLog(event: string, details = ""): void {
+    const suffix = details.length > 0 ? " " + details : "";
+    console.log(RECEIVER_LOG_PREFIX + " event=" + event + suffix);
+}
+
 function asText(value: unknown, maxLength = 200): string | null {
     if (typeof value !== "string" || value.length > maxLength) return null;
     return value.replace(/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/g, "");
@@ -86,7 +97,11 @@ function parseSamples(value: unknown): number[] | null {
     }
     return result;
 }
-function changed(): void { redraw?.(); }
+function changed(): boolean {
+    if (redraw === null) return false;
+    redraw();
+    return true;
+}
 
 function handleMessage(message: IncomingMessage): void {
     const kind = asText(message.get("TYPE"), 16);
@@ -94,21 +109,40 @@ function handleMessage(message: IncomingMessage): void {
     const value = message.get("VALUE");
     const flags = message.get("FLAGS");
     const extra = asText(message.get("EXTRA"), 48);
-    if (kind === null || id === null) return;
+    if (kind === null || id === null) {
+        receiverLog("message_rejected", "reason=missing_type_or_id");
+        return;
+    }
 
     if (kind === "slot") {
         const slot = validSlot(id);
         const metric = validMetric(value);
-        if (slot === null || metric === null) return;
+        if (slot === null || metric === null) {
+            // Do not log untrusted packet fields; a malformed sender must not
+            // be able to make the watch log contain provider/private data.
+            receiverLog("slot_update_rejected", "reason=invalid_slot_or_metric");
+            return;
+        }
+        const previous = displayState.slotConfiguration[slot];
         displayState.slotConfiguration[slot] = metric;
-        changed();
+        const redrawInvoked = changed();
+        // Slot and metric are validated enums. Log identifiers only, never
+        // display values, row text, credentials, or raw AppMessage dictionaries.
+        receiverLog(
+            "slot_update_applied",
+            "slot=" + slot + " previous=" + previous + " metric=" + metric +
+                " redraw_invoked=" + String(redrawInvoked),
+        );
         return;
     }
     if (kind === "metric") {
         const metric = validMetric(id);
         const text = asText(value);
         const stale = asFlag(flags);
-        if (metric === null || metric === "none" || text === null || stale === null) return;
+        if (metric === null || metric === "none" || text === null || stale === null) {
+            receiverLog("metric_update_rejected", "reason=invalid_metric_payload");
+            return;
+        }
         displayState.metricValues[metric] = text;
         displayState.staleMetrics[metric] = stale;
         if (metric === "weatherFeelsLike" && extra !== null && extra.length > 0) {
@@ -121,9 +155,15 @@ function handleMessage(message: IncomingMessage): void {
         const match = /^chunk\.[0-9]$/.exec(id);
         const chunkIndex = match === null ? -1 : Number(id.slice(6));
         const text = asText(value, 96);
-        if (chunkIndex < 0 || text === null) return;
+        if (chunkIndex < 0 || text === null) {
+            receiverLog("image_chunk_rejected", "reason=invalid_chunk_payload");
+            return;
+        }
         const chunkRows = text.split(";");
-        if (chunkRows.length !== 3 || !chunkRows.every((row) => /^[01]{30}$/.test(row))) return;
+        if (chunkRows.length !== 3 || !chunkRows.every((row) => /^[01]{30}$/.test(row))) {
+            receiverLog("image_chunk_rejected", "reason=invalid_chunk_rows");
+            return;
+        }
         const rows = displayState.imageRows?.slice() ?? Array.from({ length: 30 }, () => "");
         for (let i = 0; i < chunkRows.length; i++) rows[chunkIndex * 3 + i] = chunkRows[i] ?? "";
         displayState.imageRows = rows;
@@ -134,13 +174,19 @@ function handleMessage(message: IncomingMessage): void {
         switch (id) {
             case "phoneBattery": {
                 const number = asInteger(value, 0, 100);
-                if (number === null) return;
+                if (number === null) {
+                    receiverLog("status_update_rejected", "reason=invalid_phone_battery");
+                    return;
+                }
                 displayState.phoneBatteryPercent = number;
                 break;
             }
             case "phoneBluetooth": {
                 const connected = asFlag(value);
-                if (connected === null) return;
+                if (connected === null) {
+                    receiverLog("status_update_rejected", "reason=invalid_phone_bluetooth");
+                    return;
+                }
                 displayState.phoneBluetoothConnected = connected;
                 break;
             }
@@ -153,40 +199,58 @@ function handleMessage(message: IncomingMessage): void {
                 }
                 const time = validTime(raw);
                 const bedtime = asFlag(flags);
-                if (time === null || bedtime === null) return;
+                if (time === null || bedtime === null) {
+                    receiverLog("status_update_rejected", "reason=invalid_alarm_time");
+                    return;
+                }
                 displayState.alarmTime = time;
                 displayState.alarmIsBedtime = bedtime;
                 break;
             }
             case "heartRate": {
                 const bpm = asInteger(value, 20, 240);
-                if (bpm === null) return;
+                if (bpm === null) {
+                    receiverLog("status_update_rejected", "reason=invalid_heart_rate");
+                    return;
+                }
                 displayState.currentBpm = bpm;
                 break;
             }
             case "heartSamples": {
                 const samples = parseSamples(value);
-                if (samples === null) return;
+                if (samples === null) {
+                    receiverLog("status_update_rejected", "reason=invalid_heart_samples");
+                    return;
+                }
                 displayState.heartSamples = samples;
                 break;
             }
-            default: return;
+            default:
+                receiverLog("status_update_rejected", "reason=unknown_status_id");
+                return;
         }
         changed();
         return;
     }
     if (kind === "row") {
         const text = asText(value);
-        if (text === null) return;
+        if (text === null) {
+            receiverLog("row_update_rejected", "reason=invalid_row_text");
+            return;
+        }
         switch (id) {
             case "focus.1": displayState.focusRows[0] = text; break;
             case "focus.2": displayState.focusRows[1] = text; break;
             case "calendar.1": displayState.calendarRows[0] = text; break;
             case "calendar.2": displayState.calendarRows[1] = text; break;
-            default: return;
+            default:
+                receiverLog("row_update_rejected", "reason=unknown_row_id");
+                return;
         }
         changed();
+        return;
     }
+    receiverLog("message_ignored", "reason=unsupported_type");
 }
 
 const message = new Message({
@@ -199,11 +263,18 @@ const message = new Message({
         try {
             handleMessage(this.read());
         } catch {
-            // Ignore malformed or incompatible payloads without crashing the watch VM.
+            // Never log exception text or packet contents; they may include private data.
+            receiverLog("message_handler_failed", "reason=exception");
         }
     },
 });
 
+receiverLog(
+    "receiver_initialized",
+    "slot_count=" + String(SLOT_IDS.length) + " metric_count=" + String(METRIC_IDS.length),
+);
+
 export function setBridgeRedraw(callback: () => void): void {
     redraw = callback;
+    receiverLog("redraw_handler_registered");
 }
