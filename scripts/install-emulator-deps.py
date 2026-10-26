@@ -4,9 +4,28 @@ import json
 import re
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 LOCK_PATH = Path("tooling/ubuntu-24.04-emulator-deps.json")
+APT_ATTEMPTS = 4
+
+def run_with_retries(command: list[str]) -> None:
+    """Retry transient snapshot-server failures without relaxing package verification."""
+    for attempt in range(APT_ATTEMPTS):
+        try:
+            subprocess.run(command, check=True)
+            return
+        except subprocess.CalledProcessError:
+            if attempt + 1 >= APT_ATTEMPTS:
+                raise
+            delay = min(2 ** (attempt + 1), 16)
+            print(
+                f"APT snapshot operation failed (attempt {attempt + 1}/{APT_ATTEMPTS}); "
+                f"retrying in {delay}s.",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
 
 def main() -> int:
     lock = json.loads(LOCK_PATH.read_text(encoding="utf-8"))
@@ -28,11 +47,11 @@ def main() -> int:
         pins.append(name + "=" + version)
     # Ubuntu 24.04's APT supports archive snapshots. The signed Release/Packages
     # metadata authenticates the SHA-256 digests used to verify downloaded .deb files.
-    subprocess.run(["sudo", "apt-get", "update", "--snapshot", snapshot], check=True)
-    subprocess.run([
+    run_with_retries(["sudo", "apt-get", "update", "--snapshot", snapshot])
+    run_with_retries([
         "sudo", "env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "install",
         "--yes", "--no-install-recommends", "--reinstall", "--snapshot", snapshot, *pins
-    ], check=True)
+    ])
     for pin in pins:
         name, expected = pin.split("=", 1)
         installed = subprocess.check_output([

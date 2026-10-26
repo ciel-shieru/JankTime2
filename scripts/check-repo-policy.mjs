@@ -135,6 +135,9 @@ check(aptInstaller.includes("apt-get") && aptInstaller.includes("--snapshot") &&
   aptInstaller.includes("--reinstall") && aptInstaller.includes("dpkg-query") &&
   aptInstaller.includes("SHA-256") && aptInstaller.includes("Release/Packages"),
   "Emulator runtime install must use the locked snapshot, reinstall pinned package versions, and document APT digest verification.");
+check(aptInstaller.includes("def run_with_retries") && aptInstaller.includes("APT_ATTEMPTS = 4") &&
+  aptInstaller.includes("time.sleep(delay)"),
+  "Snapshot package installation must retry transient APT download failures with a bounded count and backoff.");
 check(ci.includes("python3 scripts/install-emulator-deps.py"),
   "CI must use the checked-in, snapshot-pinned emulator dependency installer.");
 const gradleProperties = read("companion/android/gradle/wrapper/gradle-wrapper.properties");

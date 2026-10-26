@@ -45,6 +45,11 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(model, /function clipByWidth/);
     const workflow = read("../.github/workflows/ci.yml");
     assert.match(workflow, /check_screenshot\.py/);
+    const emulatorInstaller = read("../scripts/install-emulator-deps.py");
+    assert.match(emulatorInstaller, /def run_with_retries/);
+    assert.match(emulatorInstaller, /APT_ATTEMPTS = 4/);
+    assert.match(emulatorInstaller, /time\.sleep\(delay\)/);
+    assert.match(emulatorInstaller, /"--snapshot", snapshot, \*pins/);
     const manifest = JSON.parse(read("../src/embeddedjs/manifest.json"));
     assert.deepEqual(manifest.resources, {});
     assert.ok(manifest.modules["*"].includes("./mdi-icons"), "The MDI mask module must be included in the embedded watch build.");
