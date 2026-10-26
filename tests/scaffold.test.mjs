@@ -209,7 +209,7 @@ test("temporary diagnostic branch renders privacy-safe watch receiver status", (
     assert.match(renderer, /JANKTIME2 RX DEBUG/);
     assert.match(renderer, /Current mapping:/);
     assert.match(renderer, /Slots applied:/);
-    assert.match(guide, /Do not uninstall, clear its storage/);
+    assert.match(guide, /Do not uninstall it, clear its storage/);
     assert.match(guide, /grid\.top\.1/);
     assert.match(guide, /must not be cherry-picked into the normal branch/);
     assert.match(bridge, /onWritable\(\)/);
