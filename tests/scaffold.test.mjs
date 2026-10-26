@@ -212,4 +212,15 @@ test("temporary diagnostic branch renders privacy-safe watch receiver status", (
     assert.match(guide, /Do not uninstall, clear its storage/);
     assert.match(guide, /grid\.top\.1/);
     assert.match(guide, /must not be cherry-picked into the normal branch/);
+    assert.match(bridge, /onWritable\(\)/);
+    assert.match(bridge, /\["TYPE", "diagnostic"\]/);
+    assert.match(bridge, /queueDiagnosticSnapshot\(\)/);
+    const manifest = read("../companion/android/app/src/main/AndroidManifest.xml");
+    assert.match(manifest, /WatchDiagnosticListenerService/);
+    assert.match(manifest, /io\.rebble\.pebblekit2\.RECEIVE_DATA_FROM_WATCH/);
+    const listener = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/pebble/WatchDiagnosticListenerService.kt");
+    assert.match(listener, /BasePebbleListenerService/);
+    assert.match(listener, /watch_receiver_diagnostic/);
+    assert.match(listener, /safeDiagnosticSummary/);
+    assert.doesNotMatch(listener, /Log\.[diwe]\(.*data/);
 });
