@@ -84,7 +84,7 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(renderer.includes("drawBattery(leftBatteryCx, statusCenterY, batteryWidth, batteryHeight"));
     assert.ok(renderer.includes("drawBattery(rightBatteryCx, statusCenterY, batteryWidth, batteryHeight"));
     assert.ok(renderer.includes("const timeRight = alarmCenterX - 7"));
-    assert.ok(renderer.includes("drawAlarm(timeRight + 8, statusCenterY, alarmColor)"), "Alarm glyph must sit immediately before Bluetooth in the right-justified status cluster.");
+    assert.ok(renderer.includes("drawAlarm(alarmCenterX, statusCenterY, alarmColor)"), "Alarm glyph must sit immediately before Bluetooth in the right-justified status cluster.");
     assert.ok(renderer.includes("const statusCenterY = 10"));
     assert.ok(renderer.includes("planetTop = 62"));
     assert.ok(renderer.includes('rows.some((row) => row.includes("1"))'), "An empty image should keep the framed image cell instead of clearing the frame.");

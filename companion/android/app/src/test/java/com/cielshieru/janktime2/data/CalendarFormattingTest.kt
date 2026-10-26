@@ -13,7 +13,10 @@ class CalendarFormattingTest {
         val now = LocalDate.of(2026, 10, 26).atTime(13, 15).atZone(zone).toInstant().toEpochMilli()
         val nextMidnight = LocalDate.of(2026, 10, 27).atStartOfDay(zone).toInstant().toEpochMilli()
         assertEquals(nextMidnight, calendarQueryEndMillis(now, onlyToday = true))
-        assertEquals(now + 7L * 24L * 60L * 60L * 1000L, calendarQueryEndMillis(now, onlyToday = false))
+        assertEquals(
+            java.time.Instant.ofEpochMilli(now).atZone(zone).plusYears(1).toInstant().toEpochMilli(),
+            calendarQueryEndMillis(now, onlyToday = false),
+        )
     }
 
     @Test

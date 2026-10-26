@@ -444,7 +444,7 @@ private fun CompanionSettingsScreen(
             Text("Only show today's next 2 events")
         }
         Text(
-            "On: only upcoming events today, without a date. Off (default): upcoming events over the next 7 days with DD/MM HH:mm.",
+            "On: only upcoming events today, without a date. Off (default): upcoming events over the next year with DD/MM HH:mm.",
             style = MaterialTheme.typography.bodySmall,
         )
         TextInput(

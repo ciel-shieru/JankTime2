@@ -31,10 +31,10 @@ data class CalendarEventRow(
 }
 
 internal fun calendarQueryEndMillis(nowMillis: Long, onlyToday: Boolean): Long {
-    if (!onlyToday) return nowMillis + 7L * 24L * 60L * 60L * 1000L
     val zone = ZoneId.systemDefault()
-    return Instant.ofEpochMilli(nowMillis).atZone(zone).toLocalDate().plusDays(1)
-        .atStartOfDay(zone).toInstant().toEpochMilli()
+    val now = Instant.ofEpochMilli(nowMillis).atZone(zone)
+    if (!onlyToday) return now.plusYears(1).toInstant().toEpochMilli()
+    return now.toLocalDate().plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli()
 }
 
 class CalendarReader(private val context: Context) {

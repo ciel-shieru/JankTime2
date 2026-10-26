@@ -5,7 +5,7 @@
 
 ## Context
 
-The face must show the next two events from calendars already synced to the phone. The user chooses which calendars are eligible and can add regex blocklist patterns. A toggle defaults off: off shows the next two events over the upcoming seven-day window and prefixes each row with DD/MM HH:mm; on restricts the query to the remainder of the current local day and shows HH:mm only. Each row also includes a location clipped to at most 10 characters and the title, with remaining overflow clipped abruptly and no ellipsis.
+The face must show the next two events from calendars already synced to the phone. The user chooses which calendars are eligible and can add regex blocklist patterns. A toggle defaults off: off shows the next two events within a one-year look-ahead and prefixes each row with DD/MM HH:mm; on restricts the query to the remainder of the current local day and shows HH:mm only. Each row also includes a location clipped to at most 10 characters and the title, with remaining overflow clipped abruptly and no ellipsis.
 
 ## Options considered
 
