@@ -38,16 +38,24 @@ Alternatively, download the **production-mode PBW artifact** from the latest suc
 
 ## Install without replacing Gravel
 
-1. Keep Gravel installed. Do not uninstall, clear its storage, or install a rebuilt Gravel APK for this test.
-2. Open Gravel and use its normal Bluetooth **Apps → Sideload App** flow to install the PBW, following the flow described by [Gravel issue #37](https://github.com/david-cant-code/pebble-app-degoogled/issues/37).
-3. Launch JankTime2 and keep it open on the watch during the test.
-4. In the native JankTime2 companion, change `grid.top.1` to **None** and press Save once. No provider configuration is needed for this test.
-5. Read the diagnostic screen:
-   - If RX remains `0`, the watch-side receiver has not read any messages in this running session.
-   - If RX increases and `Last` shows a message, delivery reached the Alloy receiver.
-   - If the target mapping changes from `focusCount` to `none`, the receiver applied the slot assignment in memory. If the normal face had remained unchanged, the failure likely lies beyond phone-side send acknowledgement and in the running build or rendering path.
-   - If RX increases but the mapping does not change and the outcome is `rejected`, send the displayed outcome and counters.
-6. Take a clear photo of the watch after Save. Record the time of the test and which PBW commit/CI run was installed.
+The reverse diagnostic channel requires a **matching diagnostic companion APK** as well as the PBW, because the existing companion build did not register a watch-to-phone listener.
+
+1. Keep Gravel installed. Do not uninstall it, clear its storage, or install a rebuilt Gravel APK.
+2. First update the existing JankTime2 companion **in place** using the `app-debug.apk` artifact from the same successful CI run as this diagnostic branch. The CI APK is signed with the repository's private debug signing key. If Android reports a signature/package conflict, **stop—do not uninstall the existing companion or clear its data**; report the error before proceeding.
+3. Open Gravel and use its normal Bluetooth **Apps → Sideload App** flow to install the diagnostic PBW, following the flow described by [Gravel issue #37](https://github.com/david-cant-code/pebble-app-degoogled/issues/37).
+4. Launch JankTime2 and keep it open on the watch during the test.
+5. Start Android log capture before launching the watchface:
+   ```sh
+   adb logcat -v threadtime -s JankTime2Sync
+   ```
+6. Look for `event=watch_diagnostic_app_opened` followed by `event=watch_receiver_diagnostic outcome=waiting rx=0` (field order may vary). This `waiting` status is sent by the watch even before any inbound packet arrives and validates the watch-to-phone direction.
+7. In the native JankTime2 companion, change `grid.top.1` to **None** and press Save once. No provider configuration is needed for this test.
+8. Read the diagnostic screen and the Android log:
+   - Startup diagnostic arrives but RX remains `0` after Save: watch-to-phone works, but phone-to-watch delivery is not reaching `Message.onReadable()`.
+   - RX increases and outcome is `slot_applied`: the incoming message reached the receiver and was accepted.
+   - The mapping changes from `focusCount` to `none`: the receiver updated the slot in memory and invoked redraw.
+   - No startup diagnostic ever appears in Logcat: verify the companion APK was updated in place, Gravel is still the selected PebbleKit app, and the matching watchface is open.
+9. Take a clear photo of the diagnostic screen after Save. Record the time and the PBW/CI run installed. Stop Logcat with Ctrl-C.
 
 ## What to send back
 
