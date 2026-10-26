@@ -160,3 +160,5 @@ Prometheus numeric/text snapshots are deliberately small. A later phase can add 
 ## Documentation
 
 Architecture choices and alternatives are in docs/adr/. Decisions involving platform API limits are grounded in the official RePebble documentation linked in those ADRs. Any new provider must update the provider contract, security review, tests, and relevant ADR.
+
+For end-to-end AppMessage receiver diagnostics and physical-watch log capture, see [Watch-side receiver logs](docs/debugging/watch-receiver-logs.md).
