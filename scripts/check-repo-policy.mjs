@@ -51,6 +51,10 @@ check(ci.includes("JANKTIME2_PRIVATE_DEBUG_SIGNING=false") &&
   ci.includes("env.JANKTIME2_PRIVATE_DEBUG_SIGNING == 'true'") &&
   ci.includes("android_tasks=(:app:testDebugUnitTest :app:lintDebug)"),
   "CI must never build or distribute a runner-default-signed debug APK when the private debug signing secrets are absent.");
+check(ci.includes("do not regenerate an incomplete metadata file") &&
+  ci.includes('if [[ "${JANKTIME2_PRIVATE_DEBUG_SIGNING:-false}" == "true" ]]') &&
+  ci.includes("sha256sum --check tooling/gradle-dependency-pins.sha256"),
+  "CI must preserve the full reviewed Gradle verification-metadata pin when APK assembly is skipped.");
 check(!/^\s*path:\s+artifacts\/\s*$/m.test(ci),
   "CI must upload screenshot and diagnostic files individually, not as a directory bundle.");
 check(ci.includes("name: screenshot_emery.png") && ci.includes("path: artifacts/screenshot_emery.png") &&

@@ -286,10 +286,18 @@ jobs:
             # signed by an unconfigured runner-default debug key.
             android_tasks=(:app:testDebugUnitTest :app:lintDebug)
           fi
-          ./companion/android/gradlew -p companion/android --no-daemon \
-            --write-verification-metadata sha256 --write-locks "${android_tasks[@]}"
+          if [[ "${JANKTIME2_PRIVATE_DEBUG_SIGNING:-false}" == "true" ]]; then
+            # Refresh candidate metadata/locks only when the complete APK task graph
+            # is selected, so the committed pin covers every packaged dependency.
+            ./companion/android/gradlew -p companion/android --no-daemon \
+              --write-verification-metadata sha256 --write-locks "${android_tasks[@]}"
+          else
+            # Without private signing, do not regenerate an incomplete metadata file
+            # from test/lint tasks alone. Validate against the committed full pin.
+            ./companion/android/gradlew -p companion/android --no-daemon "${android_tasks[@]}"
+          fi
           sha256sum --check tooling/gradle-dependency-pins.sha256
-          # This invocation uses Gradle's strict artifact and metadata verification.
+          # This invocation uses Gradle's existing strict artifact and metadata verification.
           ./companion/android/gradlew -p companion/android --no-daemon "${android_tasks[@]}"
 
       - name: Report debug APK assembly skipped
