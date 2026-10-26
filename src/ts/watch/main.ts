@@ -316,7 +316,7 @@ function drawReceiverDiagnostics(): void {
     );
     drawBaseline("Target slot: " + diagnosticSlot, smallFont, black, 6, 117);
     drawBaseline(
-        "Current mapping: " + displayState.slotConfiguration[diagnosticSlot],
+        clipped("Current mapping: " + displayState.slotConfiguration[diagnosticSlot], statusFont, 188),
         statusFont, black, 6, 137,
     );
     drawBaseline(
