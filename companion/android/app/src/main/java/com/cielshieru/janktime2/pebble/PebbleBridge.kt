@@ -1,6 +1,8 @@
 package com.cielshieru.janktime2.pebble
 
 import android.content.Context
+import kotlinx.coroutines.CancellationException
+import com.cielshieru.janktime2.data.SyncDiagnostics
 import io.rebble.pebblekit2.client.DefaultPebbleAndroidAppPicker
 import io.rebble.pebblekit2.client.DefaultPebbleSender
 import io.rebble.pebblekit2.client.PebbleAndroidAppPicker
@@ -8,6 +10,22 @@ import io.rebble.pebblekit2.common.model.PebbleDictionaryItem
 import io.rebble.pebblekit2.common.model.TransmissionResult
 import java.io.IOException
 import java.util.UUID
+
+enum class PebbleDeliveryFailure(val logCode: String) {
+    NO_SELECTED_BRIDGE("no_selected_bridge"),
+    NO_ACKNOWLEDGEMENT("no_acknowledgement"),
+    WATCH_NOT_CONNECTED("watch_not_connected"),
+    DIFFERENT_APP_OPEN("different_app_open"),
+    PERMISSIONS_DENIED("permissions_denied"),
+    WATCH_TIMEOUT("watch_timeout"),
+    WATCH_REJECTED_PACKET("watch_rejected_packet"),
+    UNKNOWN_BRIDGE_RESULT("unknown_bridge_result"),
+}
+
+class PebbleDeliveryException(
+    val failure: PebbleDeliveryFailure,
+    message: String,
+) : IOException(message)
 
 /**
  * Bounded AppMessage serializer. It sends display fields only; credentials and provider
@@ -40,9 +58,26 @@ class PebbleBridge(context: Context) : AutoCloseable {
     }
 
     suspend fun send(snapshot: com.cielshieru.janktime2.data.WatchSnapshot, config: com.cielshieru.janktime2.config.CompanionConfig) {
-        if (picker.getCurrentlySelectedApp() == null) {
-            throw IOException("No Pebble mobile app is selected. Select the installed Pebble or compatible Gravel app before refreshing.")
+        val selectedApp = try {
+            picker.getCurrentlySelectedApp()
+        } catch (cancelled: CancellationException) {
+            SyncDiagnostics.warning("bridge_selection_cancelled")
+            throw cancelled
+        } catch (failure: Exception) {
+            SyncDiagnostics.failure("bridge_selection_lookup_failed", failure, includeStack = false)
+            throw failure
         }
+        SyncDiagnostics.info("bridge_selection_checked", mapOf("selected" to (selectedApp != null).toString()))
+        if (selectedApp == null) {
+            throw PebbleDeliveryException(
+                PebbleDeliveryFailure.NO_SELECTED_BRIDGE,
+                "No Pebble mobile app is selected. Select the installed Pebble or compatible Gravel app before refreshing.",
+            )
+        }
+        SyncDiagnostics.info(
+            "watch_sync_send_started",
+            mapOf("slot_count" to config.metricSlots.size.toString(), "metric_count" to snapshot.metricValues.size.toString()),
+        )
 
         for ((slot, metric) in config.metricSlots) {
             sendMessage("slot", slot, metric)
@@ -71,6 +106,7 @@ class PebbleBridge(context: Context) : AutoCloseable {
         snapshot.calendarRows.take(2).forEachIndexed { index, text ->
             sendMessage("row", "calendar." + (index + 1), truncateUtf8(text.orEmpty(), MAX_ROW_BYTES))
         }
+        SyncDiagnostics.info("watch_sync_send_completed")
     }
 
     suspend fun sendImageRows(rows: List<String>) {
@@ -112,29 +148,67 @@ class PebbleBridge(context: Context) : AutoCloseable {
             "AppMessage payload exceeds the supported dictionary size."
         }
         senderUsed = true
-        val result = sender.sendDataToPebble(WATCHFACE_UUID, values)
+        SyncDiagnostics.debug(
+            "appmessage_send_started",
+            mapOf("type" to type, "id" to id, "payload_bytes" to wireBytes.toString()),
+        )
+        val result = try {
+            sender.sendDataToPebble(WATCHFACE_UUID, values)
+        } catch (cancelled: CancellationException) {
+            SyncDiagnostics.warning("appmessage_send_cancelled", mapOf("type" to type, "id" to id))
+            throw cancelled
+        } catch (failure: Exception) {
+            SyncDiagnostics.failure(
+                "appmessage_transport_exception",
+                failure,
+                mapOf("type" to type, "id" to id),
+                includeStack = false,
+            )
+            throw failure
+        }
         if (result.isNullOrEmpty()) {
-            throw IOException("No connected Pebble watch acknowledged the data. Check the watch's Bluetooth connection and selected mobile-app bridge.")
+            val exception = PebbleDeliveryException(
+                PebbleDeliveryFailure.NO_ACKNOWLEDGEMENT,
+                "No connected Pebble watch acknowledged the data. Check the watch's Bluetooth connection and selected mobile-app bridge.",
+            )
+            SyncDiagnostics.failure(
+                "appmessage_send_failed",
+                exception,
+                mapOf("type" to type, "id" to id),
+                includeStack = false,
+            )
+            throw exception
         }
         val failure = result.values.firstOrNull { it !== TransmissionResult.Success }
         if (failure != null) {
-            val reason = when (failure) {
+            val (code, reason) = when (failure) {
                 TransmissionResult.FailedWatchNotConnected ->
-                    "The Pebble watch is not connected. Reconnect it and refresh again."
+                    PebbleDeliveryFailure.WATCH_NOT_CONNECTED to "The Pebble watch is not connected. Reconnect it and retry."
                 TransmissionResult.FailedDifferentAppOpen ->
-                    "Open the JankTime2 watchface on the Pebble before refreshing; AppMessage is delivered only to the foreground watch app."
+                    PebbleDeliveryFailure.DIFFERENT_APP_OPEN to "Open the JankTime2 watchface on the Pebble before refreshing; AppMessage is delivered only to the foreground watch app."
                 TransmissionResult.FailedNoPermissions ->
-                    "The mobile app denied AppMessage access. Check that this watchface UUID and companion package are permitted by the installed Pebble mobile app."
+                    PebbleDeliveryFailure.PERMISSIONS_DENIED to "The mobile app denied AppMessage access. Check that this watchface UUID and companion package are permitted by the installed Pebble mobile app."
                 TransmissionResult.FailedTimeout ->
-                    "The watch did not acknowledge AppMessage before timeout. Check Bluetooth connectivity and retry."
+                    PebbleDeliveryFailure.WATCH_TIMEOUT to "The watch did not acknowledge AppMessage before timeout. Check Bluetooth connectivity and retry."
                 TransmissionResult.FailedWatchNacked ->
-                    "The watch rejected the data packet. Update/reinstall the matching JankTime2 watchface and retry."
+                    PebbleDeliveryFailure.WATCH_REJECTED_PACKET to "The watch rejected the data packet. Update/reinstall the matching JankTime2 watchface and retry."
                 is TransmissionResult.Unknown ->
-                    "The mobile-app bridge returned an unknown AppMessage result. Update the Pebble mobile app or choose another compatible bridge."
-                TransmissionResult.Success -> null
+                    PebbleDeliveryFailure.UNKNOWN_BRIDGE_RESULT to "The mobile-app bridge returned an unknown AppMessage result. Update the Pebble mobile app or choose another compatible bridge."
+                TransmissionResult.Success -> error("Unreachable success result.")
             }
-            if (reason != null) throw IOException(reason)
+            val exception = PebbleDeliveryException(code, reason)
+            SyncDiagnostics.failure(
+                "appmessage_send_rejected",
+                exception,
+                mapOf("type" to type, "id" to id, "result" to code.logCode),
+                includeStack = false,
+            )
+            throw exception
         }
+        SyncDiagnostics.debug(
+            "appmessage_acknowledged",
+            mapOf("type" to type, "id" to id, "acknowledgements" to result.size.toString()),
+        )
     }
 
     override fun close() {
