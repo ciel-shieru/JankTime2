@@ -49,6 +49,40 @@ type IncomingMessage = Map<string, MessageValue>;
 let redraw: (() => void) | null = null;
 let hasLoggedFirstIncomingMessage = false;
 
+export interface ReceiverDiagnostics {
+    messagesReceived: number;
+    slotUpdatesApplied: number;
+    messagesRejected: number;
+    redrawInvocations: number;
+    handlerErrors: number;
+    redrawHandlerRegistered: boolean;
+    lastType: string;
+    lastId: string;
+    lastOutcome: string;
+    lastDetail: string;
+    lastSlot: SlotId | null;
+    lastPreviousMetric: MetricId | null;
+    lastMetric: MetricId | null;
+    lastRedrawInvoked: boolean;
+}
+
+export const receiverDiagnostics: ReceiverDiagnostics = {
+    messagesReceived: 0,
+    slotUpdatesApplied: 0,
+    messagesRejected: 0,
+    redrawInvocations: 0,
+    handlerErrors: 0,
+    redrawHandlerRegistered: false,
+    lastType: "none",
+    lastId: "none",
+    lastOutcome: "waiting",
+    lastDetail: "no AppMessage received",
+    lastSlot: null,
+    lastPreviousMetric: null,
+    lastMetric: null,
+    lastRedrawInvoked: false,
+};
+
 const RECEIVER_LOG_PREFIX = "[JankTime2Receiver]";
 
 function receiverLog(event: string, details = ""): void {
@@ -99,9 +133,36 @@ function parseSamples(value: unknown): number[] | null {
     return result;
 }
 function changed(): boolean {
-    if (redraw === null) return false;
+    if (redraw === null) {
+        receiverDiagnostics.lastRedrawInvoked = false;
+        return false;
+    }
+    receiverDiagnostics.redrawInvocations++;
+    receiverDiagnostics.lastRedrawInvoked = true;
     redraw();
     return true;
+}
+
+function safeDiagnosticMessageId(kind: string | null, id: string | null): string {
+    if (kind === null || id === null) return "invalid";
+    if (kind === "slot") return validSlot(id) ?? "invalid";
+    if (kind === "metric") return validMetric(id) ?? "invalid";
+    if (kind === "image") return /^chunk\.[0-9]$/.test(id) ? id : "invalid";
+    if (kind === "status" &&
+        ["phoneBattery", "phoneBluetooth", "alarmTime", "heartRate", "heartSamples"].includes(id)) {
+        return id;
+    }
+    if (kind === "row" && ["focus.1", "focus.2", "calendar.1", "calendar.2"].includes(id)) {
+        return id;
+    }
+    return "invalid";
+}
+
+function rejectMessage(event: string, reason: string): void {
+    receiverDiagnostics.messagesRejected++;
+    receiverDiagnostics.lastOutcome = "rejected";
+    receiverDiagnostics.lastDetail = reason;
+    receiverLog(event, "reason=" + reason);
 }
 
 function handleMessage(message: IncomingMessage): void {
@@ -111,7 +172,7 @@ function handleMessage(message: IncomingMessage): void {
     const flags = message.get("FLAGS");
     const extra = asText(message.get("EXTRA"), 48);
     if (kind === null || id === null) {
-        receiverLog("message_rejected", "reason=missing_type_or_id");
+        rejectMessage("message_rejected", "missing_type_or_id");
         return;
     }
 
@@ -119,13 +180,18 @@ function handleMessage(message: IncomingMessage): void {
         const slot = validSlot(id);
         const metric = validMetric(value);
         if (slot === null || metric === null) {
-            // Do not log untrusted packet fields; a malformed sender must not
-            // be able to make the watch log contain provider/private data.
-            receiverLog("slot_update_rejected", "reason=invalid_slot_or_metric");
+            // Do not expose untrusted IDs or values on the diagnostic screen or logs.
+            rejectMessage("slot_update_rejected", "invalid_slot_or_metric");
             return;
         }
         const previous = displayState.slotConfiguration[slot];
         displayState.slotConfiguration[slot] = metric;
+        receiverDiagnostics.slotUpdatesApplied++;
+        receiverDiagnostics.lastSlot = slot;
+        receiverDiagnostics.lastPreviousMetric = previous;
+        receiverDiagnostics.lastMetric = metric;
+        receiverDiagnostics.lastOutcome = "slot_applied";
+        receiverDiagnostics.lastDetail = slot;
         const redrawInvoked = changed();
         // Slot and metric are validated enums. Log identifiers only, never
         // display values, row text, credentials, or raw AppMessage dictionaries.
@@ -141,9 +207,11 @@ function handleMessage(message: IncomingMessage): void {
         const text = asText(value);
         const stale = asFlag(flags);
         if (metric === null || metric === "none" || text === null || stale === null) {
-            receiverLog("metric_update_rejected", "reason=invalid_metric_payload");
+            rejectMessage("metric_update_rejected", "invalid_metric_payload");
             return;
         }
+        receiverDiagnostics.lastOutcome = "metric_applied";
+        receiverDiagnostics.lastDetail = metric;
         displayState.metricValues[metric] = text;
         displayState.staleMetrics[metric] = stale;
         if (metric === "weatherFeelsLike" && extra !== null && extra.length > 0) {
@@ -157,14 +225,16 @@ function handleMessage(message: IncomingMessage): void {
         const chunkIndex = match === null ? -1 : Number(id.slice(6));
         const text = asText(value, 96);
         if (chunkIndex < 0 || text === null) {
-            receiverLog("image_chunk_rejected", "reason=invalid_chunk_payload");
+            rejectMessage("image_chunk_rejected", "invalid_chunk_payload");
             return;
         }
         const chunkRows = text.split(";");
         if (chunkRows.length !== 3 || !chunkRows.every((row) => /^[01]{30}$/.test(row))) {
-            receiverLog("image_chunk_rejected", "reason=invalid_chunk_rows");
+            rejectMessage("image_chunk_rejected", "invalid_chunk_rows");
             return;
         }
+        receiverDiagnostics.lastOutcome = "image_applied";
+        receiverDiagnostics.lastDetail = "chunk." + String(chunkIndex);
         const rows = displayState.imageRows?.slice() ?? Array.from({ length: 30 }, () => "");
         for (let i = 0; i < chunkRows.length; i++) rows[chunkIndex * 3 + i] = chunkRows[i] ?? "";
         displayState.imageRows = rows;
@@ -176,7 +246,7 @@ function handleMessage(message: IncomingMessage): void {
             case "phoneBattery": {
                 const number = asInteger(value, 0, 100);
                 if (number === null) {
-                    receiverLog("status_update_rejected", "reason=invalid_phone_battery");
+                    rejectMessage("status_update_rejected", "invalid_phone_battery");
                     return;
                 }
                 displayState.phoneBatteryPercent = number;
@@ -185,7 +255,7 @@ function handleMessage(message: IncomingMessage): void {
             case "phoneBluetooth": {
                 const connected = asFlag(value);
                 if (connected === null) {
-                    receiverLog("status_update_rejected", "reason=invalid_phone_bluetooth");
+                    rejectMessage("status_update_rejected", "invalid_phone_bluetooth");
                     return;
                 }
                 displayState.phoneBluetoothConnected = connected;
@@ -201,7 +271,7 @@ function handleMessage(message: IncomingMessage): void {
                 const time = validTime(raw);
                 const bedtime = asFlag(flags);
                 if (time === null || bedtime === null) {
-                    receiverLog("status_update_rejected", "reason=invalid_alarm_time");
+                    rejectMessage("status_update_rejected", "invalid_alarm_time");
                     return;
                 }
                 displayState.alarmTime = time;
@@ -211,7 +281,7 @@ function handleMessage(message: IncomingMessage): void {
             case "heartRate": {
                 const bpm = asInteger(value, 20, 240);
                 if (bpm === null) {
-                    receiverLog("status_update_rejected", "reason=invalid_heart_rate");
+                    rejectMessage("status_update_rejected", "invalid_heart_rate");
                     return;
                 }
                 displayState.currentBpm = bpm;
@@ -220,23 +290,25 @@ function handleMessage(message: IncomingMessage): void {
             case "heartSamples": {
                 const samples = parseSamples(value);
                 if (samples === null) {
-                    receiverLog("status_update_rejected", "reason=invalid_heart_samples");
+                    rejectMessage("status_update_rejected", "invalid_heart_samples");
                     return;
                 }
                 displayState.heartSamples = samples;
                 break;
             }
             default:
-                receiverLog("status_update_rejected", "reason=unknown_status_id");
+                rejectMessage("status_update_rejected", "unknown_status_id");
                 return;
         }
+        receiverDiagnostics.lastOutcome = "status_applied";
+        receiverDiagnostics.lastDetail = id;
         changed();
         return;
     }
     if (kind === "row") {
         const text = asText(value);
         if (text === null) {
-            receiverLog("row_update_rejected", "reason=invalid_row_text");
+            rejectMessage("row_update_rejected", "invalid_row_text");
             return;
         }
         switch (id) {
@@ -245,12 +317,16 @@ function handleMessage(message: IncomingMessage): void {
             case "calendar.1": displayState.calendarRows[0] = text; break;
             case "calendar.2": displayState.calendarRows[1] = text; break;
             default:
-                receiverLog("row_update_rejected", "reason=unknown_row_id");
+                rejectMessage("row_update_rejected", "unknown_row_id");
                 return;
         }
+        receiverDiagnostics.lastOutcome = "row_applied";
+        receiverDiagnostics.lastDetail = id;
         changed();
         return;
     }
+    receiverDiagnostics.lastOutcome = "ignored";
+    receiverDiagnostics.lastDetail = "unsupported_type";
     receiverLog("message_ignored", "reason=unsupported_type");
 }
 
@@ -261,20 +337,35 @@ const message = new Message({
     output: 124,
     keys: ["TYPE", "ID", "VALUE", "FLAGS", "EXTRA"],
     onReadable() {
+        const previousRedrawCount = receiverDiagnostics.redrawInvocations;
         try {
             const incoming = this.read();
+            const type = asText(incoming.get("TYPE"), 16);
+            const id = asText(incoming.get("ID"), 24);
+            const supportedType = type !== null &&
+                ["slot", "metric", "image", "status", "row"].includes(type)
+                ? type : "unknown";
+            receiverDiagnostics.messagesReceived++;
+            receiverDiagnostics.lastType = supportedType;
+            receiverDiagnostics.lastId = safeDiagnosticMessageId(type, id);
+            receiverDiagnostics.lastOutcome = "received";
+            receiverDiagnostics.lastDetail = "";
             if (!hasLoggedFirstIncomingMessage) {
-                const type = asText(incoming.get("TYPE"), 16);
-                const supportedType = type !== null &&
-                    ["slot", "metric", "image", "status", "row"].includes(type)
-                    ? type : "unknown";
                 receiverLog("first_message_received", "type=" + supportedType);
                 hasLoggedFirstIncomingMessage = true;
             }
             handleMessage(incoming);
         } catch {
             // Never log exception text or packet contents; they may include private data.
+            receiverDiagnostics.handlerErrors++;
+            receiverDiagnostics.lastOutcome = "handler_error";
+            receiverDiagnostics.lastDetail = "exception";
             receiverLog("message_handler_failed", "reason=exception");
+        }
+        // Invalid/unsupported packets do not normally redraw the production face.
+        // The diagnostic build redraws once so the on-watch status reflects the outcome.
+        if (DIAGNOSTIC_MODE && receiverDiagnostics.redrawInvocations === previousRedrawCount) {
+            try { changed(); } catch { /* Keep diagnostics best-effort. */ }
         }
     },
 });
@@ -286,5 +377,6 @@ receiverLog(
 
 export function setBridgeRedraw(callback: () => void): void {
     redraw = callback;
+    receiverDiagnostics.redrawHandlerRegistered = true;
     receiverLog("redraw_handler_registered");
 }
