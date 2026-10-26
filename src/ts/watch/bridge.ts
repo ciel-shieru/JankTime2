@@ -1,4 +1,5 @@
 import Message from "pebble/message";
+import { DIAGNOSTIC_MODE } from "./config";
 
 // The Moddable XS watch runtime exposes console.log; this declaration keeps
 // the watch-only TypeScript config independent of browser/Node type libraries.
