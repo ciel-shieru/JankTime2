@@ -197,3 +197,19 @@ test("all accepted architecture decisions are present", () => {
 test("native companion is selected instead of PebbleKit JS", () => {
     assert.equal(existsSync(new URL("../src/pkjs/index.js", import.meta.url)), false);
 });
+
+test("temporary diagnostic branch renders privacy-safe watch receiver status", () => {
+    const config = read("../src/ts/watch/config.ts");
+    const bridge = read("../src/ts/watch/bridge.ts");
+    const renderer = read("../src/ts/watch/main.ts");
+    const guide = read("../docs/debugging/temporary-diagnostic-build.md");
+    assert.match(config, /DIAGNOSTIC_MODE = true/);
+    assert.match(bridge, /export const receiverDiagnostics/);
+    assert.match(bridge, /safeDiagnosticMessageId/);
+    assert.match(renderer, /JANKTIME2 RX DEBUG/);
+    assert.match(renderer, /Current mapping:/);
+    assert.match(renderer, /Slots applied:/);
+    assert.match(guide, /Do not uninstall, clear its storage/);
+    assert.match(guide, /grid\.top\.1/);
+    assert.match(guide, /must not be cherry-picked into the normal branch/);
+});
