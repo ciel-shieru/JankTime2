@@ -60,7 +60,7 @@ check(ci.includes("name: screenshot_emery.png") && ci.includes("path: artifacts/
   ci.includes("name: janktime2-emery-production.pbw") &&
   ci.includes("path: release/janktime2-emery-production.pbw"),
   "CI must upload individual output files using their real filenames as artifact names.");
-check(ci.includes("actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9") && (ci.match(/archive: false/g) || []).length === 7,
+check(ci.includes("actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9") && (ci.match(/archive: false/g) || []).length === 9,
   "CI must use the pinned v7 upload-artifact action with archive:false for every single-file output.");
 
 check(ci.includes("npm ci --ignore-scripts"), "CI must install npm dependencies using npm ci with lifecycle scripts disabled.");
