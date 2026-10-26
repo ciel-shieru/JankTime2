@@ -49,6 +49,9 @@ type MessageValue = string | number;
 type IncomingMessage = Map<string, MessageValue>;
 let redraw: (() => void) | null = null;
 let hasLoggedFirstIncomingMessage = false;
+let diagnosticWritable = false;
+let diagnosticSnapshotPending = false;
+let diagnosticWriter: { write(message: Map<string, MessageValue>): void } | null = null;
 
 export interface ReceiverDiagnostics {
     messagesReceived: number;
@@ -164,6 +167,44 @@ function rejectMessage(event: string, reason: string): void {
     receiverDiagnostics.lastOutcome = "rejected";
     receiverDiagnostics.lastDetail = reason;
     receiverLog(event, "reason=" + reason);
+}
+
+function diagnosticSummary(): string {
+    const state = receiverDiagnostics;
+    if (state.lastSlot !== null && state.lastPreviousMetric !== null && state.lastMetric !== null) {
+        // All fields are validated enum values; this compact summary is safe to send to the phone.
+        return state.lastSlot + ":" + state.lastPreviousMetric + ">" + state.lastMetric +
+            ":" + (state.lastRedrawInvoked ? "1" : "0");
+    }
+    return state.lastType + ":" + state.lastId;
+}
+
+function flushDiagnosticSnapshot(): void {
+    if (!DIAGNOSTIC_MODE || !diagnosticWritable || !diagnosticSnapshotPending || diagnosticWriter === null) return;
+
+    diagnosticWritable = false;
+    diagnosticSnapshotPending = false;
+    const state = receiverDiagnostics;
+    try {
+        diagnosticWriter.write(new Map<string, MessageValue>([
+            ["TYPE", "diagnostic"],
+            ["ID", "receiver"],
+            ["VALUE", state.lastOutcome],
+            ["FLAGS", Math.min(state.messagesReceived, 2147483647)],
+            ["EXTRA", diagnosticSummary()],
+        ]));
+        receiverLog("diagnostic_snapshot_queued", "rx=" + String(state.messagesReceived));
+    } catch {
+        // Never log exception content or dictionary data.
+        diagnosticSnapshotPending = true;
+        receiverLog("diagnostic_snapshot_failed", "reason=write_exception");
+    }
+}
+
+function queueDiagnosticSnapshot(): void {
+    if (!DIAGNOSTIC_MODE) return;
+    diagnosticSnapshotPending = true;
+    flushDiagnosticSnapshot();
 }
 
 function handleMessage(message: IncomingMessage): void {
@@ -368,6 +409,17 @@ const message = new Message({
         if (DIAGNOSTIC_MODE && receiverDiagnostics.redrawInvocations === previousRedrawCount) {
             try { changed(); } catch { /* Keep diagnostics best-effort. */ }
         }
+        // Report every incoming packet/outcome through the native companion's
+        // PebbleKit Android 2 listener; this works even without Developer Connection.
+        queueDiagnosticSnapshot();
+    },
+    onWritable() {
+        diagnosticWriter = this;
+        diagnosticWritable = true;
+        flushDiagnosticSnapshot();
+    },
+    onSuspend() {
+        diagnosticWritable = false;
     },
 });
 
@@ -380,4 +432,7 @@ export function setBridgeRedraw(callback: () => void): void {
     redraw = callback;
     receiverDiagnostics.redrawHandlerRegistered = true;
     receiverLog("redraw_handler_registered");
+    // Startup marker proves the watch-to-phone path even if no phone-to-watch
+    // AppMessage ever reaches onReadable().
+    queueDiagnosticSnapshot();
 }
