@@ -224,11 +224,11 @@ class PebbleBridge(context: Context) : AutoCloseable {
 
     companion object {
         val WATCHFACE_UUID: UUID = UUID.fromString("5448a6a5-e5c9-4692-ae14-3fbdf0497e8e")
-        private const val TYPE_KEY = 0u
-        private const val ID_KEY = 1u
-        private const val VALUE_KEY = 2u
-        private const val FLAGS_KEY = 3u
-        private const val EXTRA_KEY = 4u
+        private const val TYPE_KEY = 10000u
+        private const val ID_KEY = 10001u
+        private const val VALUE_KEY = 10002u
+        private const val FLAGS_KEY = 10003u
+        private const val EXTRA_KEY = 10004u
         private const val MAX_APP_MESSAGE_BYTES = 124
         private const val ENTRY_OVERHEAD_BYTES = 4
         private const val MAX_VALUE_BYTES = 64

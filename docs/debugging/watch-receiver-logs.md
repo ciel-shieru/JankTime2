@@ -1,6 +1,6 @@
 # Debugging the watch-side AppMessage receiver
 
-Use this guide when the Android companion reports that AppMessage packets were acknowledged but the watchface did not visibly apply its configuration. The Android sender's acknowledgement is not, by itself, proof that the watch-side TypeScript receiver accepted the slot assignment and redrew the face.
+Use this guide when the Android companion reports that AppMessage packets were acknowledged but the watchface did not visibly apply its configuration. The Android sender's acknowledgement is not, by itself, proof that the watch-side TypeScript receiver accepted the slot assignment and redrew the face. Alloy assigns the `messageKeys` array IDs starting at `10000`; the native sender must use IDs `10000`–`10004`, not `0`–`4`, or the named-key receiver will never match the packet.
 
 ## What the watch logs contain
 
@@ -60,7 +60,7 @@ Do not include provider tokens, credentials, full configuration backups, private
 ## Interpreting the result
 
 - **No `receiver_initialized` line:** the log stream may have attached too late, JankTime2 was not relaunched, or the installed watchface is an older/different build.
-- **Initialization and redraw registration appear, but no `slot_update_applied` after the phone logs show slot packets being sent:** the packets are not reaching this receiver, or the active watchface/session is not the expected build.
+- **Initialization and redraw registration appear, but no `first_message_received` or `slot_update_applied` after the phone logs show slot packets being sent:** confirm that the installed PBW and Android companion use the Alloy wire IDs `10000`–`10004` and come from the same revision. Older senders using IDs `0`–`4` do not match the Alloy receiver.
 - **`slot_update_applied ... redraw_invoked=true` appears for the changed slot but the cell does not clear:** the receiver processed the assignment and the redraw callback returned; the remaining problem is likely in the active build/rendering path. Include the screenshot and exact build revision.
 - **`redraw_invoked=false`:** the assignment arrived before a redraw callback was registered.
 - **`slot_update_rejected` or `message_handler_failed` appears:** include those lines and the surrounding timestamps. The trace intentionally omits raw packet contents.

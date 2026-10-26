@@ -15,13 +15,14 @@ The watchface needs data from a separate Android app. The chosen architecture ex
 
 ## Decision
 
-Choose option 3. The message keys are TYPE, ID, VALUE, FLAGS, and EXTRA. package.json declares them in order. Payload type, identifier, string size, numeric ranges, time format, metric IDs, slot IDs, and graph size are validated on the watch. Stale state travels as a numeric flag. The phone handles provider networking, credentials, caching, Android system APIs, and image preprocessing; the watch receives display-ready fields only.
+Choose option 3. The message keys are TYPE, ID, VALUE, FLAGS, and EXTRA. `package.json` declares them in order; the Alloy SDK assigns their wire IDs from `10000 + index` (`TYPE=10000` through `EXTRA=10004`). The watch receiver uses an explicit key-to-ID map and the Android sender uses those same numeric IDs. Using legacy zero-based IDs causes transport delivery to succeed without invoking the watch's named-key handler. Payload type, identifier, string size, numeric ranges, time format, metric IDs, slot IDs, and graph size are validated on the watch. Stale state travels as a numeric flag. The phone handles provider networking, credentials, caching, Android system APIs, and image preprocessing; the watch receives display-ready fields only.
 
 See docs/integrations/appmessage-protocol.md for packet definitions.
 
 ## Consequences
 
 - New packet types require a protocol/ADR update and tests.
+- A regression test keeps the package key order, Alloy wire IDs, and Android numeric dictionary keys aligned.
 - Invalid messages are ignored without modifying display state.
 - The app splits updates into small messages and handles native transport acknowledgement/backpressure. The companion surfaces missing bridge selection and provider refresh failures instead of silently reporting success.
 - AppMessage is not used to transport credentials or whole provider responses.

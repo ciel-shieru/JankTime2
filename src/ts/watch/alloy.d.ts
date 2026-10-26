@@ -50,7 +50,7 @@ declare module "embedded:sensor/Battery" {
 }
 declare module "pebble/message" {
     interface MessageOptions {
-        keys: string[];
+        keys: string[] | Map<string, number>;
         /** Incoming/outgoing AppMessage buffer capacities in bytes. */
         input?: number;
         output?: number;
@@ -60,7 +60,7 @@ declare module "pebble/message" {
     }
     class WatchMessage {
         constructor(options: MessageOptions);
-        read(): Map<string, string | number>;
+        read(): Map<string | number, string | number | ArrayBuffer>;
         write(message: Map<string, string | number>): void;
         close(): void;
     }

@@ -44,8 +44,8 @@ export const displayState: BridgeDisplayState = {
     imageRows: null,
 };
 
-type MessageValue = string | number;
-type IncomingMessage = Map<string, MessageValue>;
+type MessageValue = string | number | ArrayBuffer;
+type IncomingMessage = Map<string | number, MessageValue>;
 let redraw: (() => void) | null = null;
 let hasLoggedFirstIncomingMessage = false;
 
@@ -259,7 +259,15 @@ const message = new Message({
     // 8 KiB buffers in each direction; this protocol never needs those buffers.
     input: 124,
     output: 124,
-    keys: ["TYPE", "ID", "VALUE", "FLAGS", "EXTRA"],
+    // Keep wire IDs explicit: Alloy's array shorthand assigns 10000 + index.
+    // The Android companion must use these exact numeric AppMessage dictionary keys.
+    keys: new Map<string, number>([
+        ["TYPE", 10000],
+        ["ID", 10001],
+        ["VALUE", 10002],
+        ["FLAGS", 10003],
+        ["EXTRA", 10004],
+    ]),
     onReadable() {
         try {
             const incoming = this.read();

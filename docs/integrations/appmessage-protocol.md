@@ -2,7 +2,7 @@
 
 Protocol version 1 is intended for the native PebbleKit Android 2 companion configured in package.json. The watch accepts only typed, bounded display values. Never send raw provider JSON or an arbitrary resource path from a provider.
 
-Each AppMessage uses fixed keys TYPE, ID, VALUE, FLAGS, and EXTRA. EXTRA is reserved for future compatible extensions. The native sender maps those names to numeric dictionary keys in the same order as package.json's messageKeys list.
+Each AppMessage uses fixed keys TYPE, ID, VALUE, FLAGS, and EXTRA. EXTRA is reserved for future compatible extensions. The Alloy SDK assigns AppMessage wire IDs as `10000 + index` in `package.json`'s `messageKeys` order: `TYPE=10000`, `ID=10001`, `VALUE=10002`, `FLAGS=10003`, and `EXTRA=10004`. The watch receiver pins those IDs in an explicit `Map`, and the Android sender must use the same IDs. Do not use legacy zero-based IDs (`0`–`4`): the transport can acknowledge delivery while the Alloy receiver fails to match any key.
 
 - slot: ID is one of the eleven slot IDs; VALUE is an allowlisted metric ID. This changes only that slot.
 - metric: ID is a metric ID; VALUE is a display string no longer than 200 characters; FLAGS is 0 (fresh) or 1 (stale).
