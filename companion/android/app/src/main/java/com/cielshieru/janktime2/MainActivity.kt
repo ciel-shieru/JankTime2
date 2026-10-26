@@ -193,14 +193,14 @@ private fun CompanionSettingsScreen(
     val exportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
         if (uri != null) scope.launch {
             try {
-                val exportedSecrets = if (pendingExportIncludesSecrets) {
-                    val entered = mapOf(
+                val exportedSecrets: Map<String, String>? = if (pendingExportIncludesSecrets) {
+                    val entered: Map<String, String> = mapOf(
                         "home_assistant" to secrets.homeAssistant,
                         "prometheus" to secrets.prometheus,
                         "mindwtr" to secrets.mindwtr,
                         "wakey_pairing" to secrets.wakeyPairing,
                     )
-                    buildMap {
+                    buildMap<String, String> {
                         for (key in listOf("home_assistant", "prometheus", "mindwtr", "wakey_pairing")) {
                             val typed = entered[key].orEmpty()
                             val stored = if (typed.isBlank()) onGetSavedSecret(key).orEmpty() else typed

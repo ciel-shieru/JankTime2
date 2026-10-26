@@ -181,12 +181,12 @@ object ConfigBackupCodec {
             }
             values
         }
-        val decodedRows = if (!root.has("imageRows")) null else {
+        val decodedRows: List<String>? = if (!root.has("imageRows")) null else {
             val array = root.optJSONArray("imageRows")
                 ?: throw IllegalArgumentException("Image rows must be a JSON array.")
-            if (array.length() == 0) emptyList() else {
+            if (array.length() == 0) emptyList<String>() else {
                 require(array.length() == 30) { "Image backup must contain exactly 30 rows." }
-                buildList {
+                buildList<String> {
                     for (i in 0 until array.length()) {
                         val row = array.opt(i)
                         require(row is String && row.matches(Regex("[01]{30}"))) {
