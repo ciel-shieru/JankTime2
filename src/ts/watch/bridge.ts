@@ -47,6 +47,7 @@ export const displayState: BridgeDisplayState = {
 type MessageValue = string | number;
 type IncomingMessage = Map<string, MessageValue>;
 let redraw: (() => void) | null = null;
+let hasLoggedFirstIncomingMessage = false;
 
 const RECEIVER_LOG_PREFIX = "[JankTime2Receiver]";
 
@@ -261,7 +262,16 @@ const message = new Message({
     keys: ["TYPE", "ID", "VALUE", "FLAGS", "EXTRA"],
     onReadable() {
         try {
-            handleMessage(this.read());
+            const incoming = this.read();
+            if (!hasLoggedFirstIncomingMessage) {
+                const type = asText(incoming.get("TYPE"), 16);
+                const supportedType = type !== null &&
+                    ["slot", "metric", "image", "status", "row"].includes(type)
+                    ? type : "unknown";
+                receiverLog("first_message_received", "type=" + supportedType);
+                hasLoggedFirstIncomingMessage = true;
+            }
+            handleMessage(incoming);
         } catch {
             // Never log exception text or packet contents; they may include private data.
             receiverLog("message_handler_failed", "reason=exception");
