@@ -264,11 +264,11 @@ function drawRows(): void {
         displayState.calendarRows[1] ?? (PREVIEW_MODE ? formatCalendarRow("15:30", "Home", "Model eval run") : ""),
     ];
     line(5, 153, 195, 153, black);
-    drawBaseline(clipped(focus[0] ?? "", smallFont, 190), smallFont, black, 6, 169);
-    drawBaseline(clipped(focus[1] ?? "", smallFont, 190), smallFont, black, 6, 184);
+    drawBaseline(clipped(focus[0] ?? "", statusFont, 190), statusFont, black, 6, 169);
+    drawBaseline(clipped(focus[1] ?? "", statusFont, 190), statusFont, black, 6, 184);
     line(5, 188, 195, 188, black);
-    drawBaseline(clipped(events[0] ?? "", smallFont, 190), smallFont, black, 6, 207);
-    drawBaseline(clipped(events[1] ?? "", smallFont, 190), smallFont, black, 6, 221);
+    drawBaseline(clipped(events[0] ?? "", statusFont, 190), statusFont, black, 6, 207);
+    drawBaseline(clipped(events[1] ?? "", statusFont, 190), statusFont, black, 6, 221);
 }
 function drawStatus(date: Date): void {
     const statusCenterY = 10;
