@@ -25,7 +25,7 @@ function systemFont(size: 9 | 14 | 18 | 24 | 28 | 36, bold = false): PocoFont {
     return new render.Font(bold ? "Gothic-Bold" : "Gothic-Regular", size);
 }
 const statusFont = systemFont(14);
-const valueFont = systemFont(14);
+const valueFont = systemFont(14, true);
 const smallFont = systemFont(9);
 const clockFont = new render.Font("Leco-Bold", 36);
 
@@ -128,7 +128,7 @@ function drawBluetooth(cx: number, cy: number, color: unknown): void {
 }
 function drawBattery(x: number, y: number, width: number, percent: number | null, color: unknown): void {
     const height = 12;
-    drawMdiGlyph(x + Math.floor(width / 2), y + Math.floor(height / 2), color, "battery-outline", width, height);
+    drawMdiGlyph(x + Math.floor(width / 2), y + Math.floor(height / 2), color, "battery-outline", width, (height*1.25));
     const safe = percent === null ? null : Math.max(0, Math.min(100, Math.trunc(percent)));
     centeredAtY(safe === null ? "--" : String(safe), smallFont, black, x + Math.floor(width / 2), y + Math.floor(height / 2));
 }
