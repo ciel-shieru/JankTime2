@@ -91,7 +91,8 @@ class HomeAssistantClient {
             // if the endpoint/policy disallows it, the pure helper falls back to raw state.
             runCatching { fetchTranslatedState(baseUrl, token, entityId) }.getOrNull()
         } else null
-        return resolveClimateDisplayValue(state, attribute, translated)
+        val attributeValue = if (attribute.isBlank() || attribute == "state") null else state.attributes.opt(attribute)
+        return resolveClimateDisplayValue(state.state, attribute, translated, attributeValue)
     }
 
     private fun fetchTranslatedState(baseUrl: String, token: String, entityId: String): String? {
@@ -153,15 +154,18 @@ internal fun weatherFromValues(
     )
 }
 
-internal fun resolveClimateDisplayValue(state: HomeAssistantState, attribute: String, translatedState: String? = null): String? {
-    if (attribute.isBlank()) {
-        return cleanClimateDisplayValue(translatedState ?: state.translatedState ?: state.state)
-    }
-    if (attribute == "state") return cleanClimateDisplayValue(state.state)
+internal fun resolveClimateDisplayValue(
+    rawState: String,
+    attribute: String,
+    translatedState: String? = null,
+    attributeValue: Any? = null,
+): String? {
+    if (attribute.isBlank()) return cleanClimateDisplayValue(translatedState ?: rawState)
+    if (attribute == "state") return cleanClimateDisplayValue(rawState)
     require(attribute.matches(Regex("[a-zA-Z_][a-zA-Z0-9_]{0,63}"))) {
         "Climate attribute name is invalid."
     }
-    val value = state.attributes.opt(attribute) ?: return null
+    val value = attributeValue ?: return null
     if (value is JSONObject || value is JSONArray || value == JSONObject.NULL) return null
     return cleanClimateDisplayValue(value.toString())
 }

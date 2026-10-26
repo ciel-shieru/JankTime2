@@ -1,6 +1,5 @@
 package com.cielshieru.janktime2.network
 
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -37,15 +36,8 @@ class HomeAssistantClientTest {
 
     @Test
     fun blankClimateAttributeUsesTranslatedStateAndFallsBackToRawState() {
-        val state = HomeAssistantState(
-            entityId = "climate.living_room",
-            state = "heat",
-            attributes = JSONObject(),
-            translatedState = "Heating",
-        )
-        assertEquals("Heating", resolveClimateDisplayValue(state, ""))
-        assertEquals("Heating", resolveClimateDisplayValue(state, "", "Heating"))
-        assertEquals("heat", resolveClimateDisplayValue(state.copy(translatedState = null), ""))
-        assertEquals("heat", resolveClimateDisplayValue(state, "state"))
+        assertEquals("Heating", resolveClimateDisplayValue("heat", "", "Heating"))
+        assertEquals("heat", resolveClimateDisplayValue("heat", ""))
+        assertEquals("heat", resolveClimateDisplayValue("heat", "state"))
     }
 }
