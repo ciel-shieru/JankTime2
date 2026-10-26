@@ -87,9 +87,10 @@ class HomeAssistantClient {
     fun climateDisplayValue(baseUrl: String, token: String, entityId: String, attribute: String): String? {
         val state = fetchState(baseUrl, token, entityId)
         val translated = if (attribute.isBlank()) {
-            // The REST endpoint returns raw IDs. Try state_translated via the template API;
-            // if the endpoint/policy disallows it, the pure helper falls back to raw state.
+            // Prefer the actual translated state from HA; use any translated value already
+            // carried by the response as a fallback before displaying the raw state.
             runCatching { fetchTranslatedState(baseUrl, token, entityId) }.getOrNull()
+                ?: state.translatedState
         } else null
         val attributeValue = if (attribute.isBlank() || attribute == "state") null else state.attributes.opt(attribute)
         return resolveClimateDisplayValue(state.state, attribute, translated, attributeValue)

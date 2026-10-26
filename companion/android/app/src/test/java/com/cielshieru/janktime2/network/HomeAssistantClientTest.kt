@@ -39,5 +39,6 @@ class HomeAssistantClientTest {
         assertEquals("Heating", resolveClimateDisplayValue("heat", "", "Heating"))
         assertEquals("heat", resolveClimateDisplayValue("heat", ""))
         assertEquals("heat", resolveClimateDisplayValue("heat", "state"))
+        assertEquals("21.5", resolveClimateDisplayValue("heat", "temperature", attributeValue = 21.5))
     }
 }
