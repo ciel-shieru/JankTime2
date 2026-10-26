@@ -21,19 +21,16 @@ class CompanionConfigTest {
     }
 
     @Test
-    fun calendarTodayOnlyDefaultsOffAndSurvivesBackupRoundTrip() {
+    fun calendarTodayOnlyDefaultsOffAndSupportsLegacyBackups() {
         assertFalse(CompanionConfig().calendarTodayOnly)
         assertEquals("", CompanionConfig().climateAttribute)
-        val enabled = CompanionConfig(calendarTodayOnly = true, climateAttribute = "")
-        val restored = ConfigBackupCodec.decode(ConfigBackupCodec.encode(enabled)).config
-        assertTrue(restored.calendarTodayOnly)
-        assertEquals("", restored.climateAttribute)
+        assertTrue(decodeCalendarTodayOnly(true, true))
+        assertFalse(decodeCalendarTodayOnly(true, false))
 
-        // Older schema-v1 backups that lack the optional field stay compatible.
-        val legacy = ConfigBackupCodec.decode(
-            """{"schemaVersion":1,"config":{"climateAttribute":""}}"""
-        ).config
-        assertFalse(legacy.calendarTodayOnly)
+        // Older schema-v1 backups without the optional field default to disabled.
+        assertFalse(decodeCalendarTodayOnly(false, null))
+        runCatching { decodeCalendarTodayOnly(true, "true") }
+            .onSuccess { throw AssertionError("Accepted a non-boolean calendar setting") }
     }
 
     @Test

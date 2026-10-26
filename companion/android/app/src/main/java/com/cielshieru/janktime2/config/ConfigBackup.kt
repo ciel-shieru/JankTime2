@@ -11,6 +11,12 @@ data class ConfigBackup(
     val imageRows: List<String>? = null,
 )
 
+internal fun decodeCalendarTodayOnly(hasField: Boolean, value: Any?): Boolean {
+    if (!hasField) return false
+    require(value is Boolean) { "Invalid calendar today-only setting." }
+    return value
+}
+
 object ConfigBackupCodec {
     const val MAX_IMPORT_BYTES = 256 * 1024
     private const val SCHEMA_VERSION = 1
@@ -142,11 +148,7 @@ object ConfigBackupCodec {
                 add(item)
             }
         }
-        val calendarTodayOnly = if (!c.has("calendarTodayOnly")) false else {
-            val value = c.opt("calendarTodayOnly")
-            require(value is Boolean) { "Invalid calendar today-only setting." }
-            value
-        }
+        val calendarTodayOnly = decodeCalendarTodayOnly(c.has("calendarTodayOnly"), c.opt("calendarTodayOnly"))
         val config = CompanionConfig(
             homeAssistantUrl = string("homeAssistantUrl", max = 2048),
             sensorEntity = string("sensorEntity", max = 255),
@@ -154,7 +156,7 @@ object ConfigBackupCodec {
             waterEntity = string("waterEntity", max = 255),
             weatherEntity = string("weatherEntity", max = 255),
             climateEntity = string("climateEntity", max = 255),
-            climateAttribute = string("climateAttribute", "temperature", 64),
+            climateAttribute = string("climateAttribute", "", 64),
             prometheusUrl = string("prometheusUrl", max = 2048),
             cpuQuery = string("cpuQuery", max = 512),
             memoryQuery = string("memoryQuery", max = 512),

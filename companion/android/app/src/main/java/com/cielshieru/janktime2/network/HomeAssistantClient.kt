@@ -128,14 +128,27 @@ class HomeAssistantClient {
     }
 }
 
-internal fun weatherFromState(current: HomeAssistantState, forecast: HomeAssistantForecast?): HomeAssistantWeather {
-    val apparentTemperature = numericValueInRange(current.attributes.opt("apparent_temperature"))
-    val currentTemperature = numericValueInRange(current.attributes.opt("temperature"))
+internal fun weatherFromState(current: HomeAssistantState, forecast: HomeAssistantForecast?): HomeAssistantWeather =
+    weatherFromValues(
+        condition = current.state,
+        apparentTemperature = current.attributes.opt("apparent_temperature"),
+        currentTemperature = current.attributes.opt("temperature"),
+        forecast = forecast,
+    )
+
+internal fun weatherFromValues(
+    condition: String,
+    apparentTemperature: Any?,
+    currentTemperature: Any?,
+    forecast: HomeAssistantForecast?,
+): HomeAssistantWeather {
+    val apparent = numericValueInRange(apparentTemperature)
+    val current = numericValueInRange(currentTemperature)
     return HomeAssistantWeather(
-        condition = current.state.lowercase().take(40),
+        condition = condition.lowercase().take(40),
         // Many integrations omit apparent_temperature but do expose current temperature.
-        displayTemperature = apparentTemperature ?: forecast?.apparentTemperature
-            ?: currentTemperature ?: forecast?.temperature,
+        displayTemperature = apparent ?: forecast?.apparentTemperature
+            ?: current ?: forecast?.temperature,
         rainChancePercent = forecast?.rainChancePercent,
     )
 }
