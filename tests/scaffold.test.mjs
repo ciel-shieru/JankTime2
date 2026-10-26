@@ -116,8 +116,10 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(workflow.includes("JANKTIME2_PRIVATE_DEBUG_SIGNING=true"));
     assert.ok(workflow.includes("env.JANKTIME2_PRIVATE_DEBUG_SIGNING == 'true'"));
     assert.ok(workflow.includes("android_tasks=(:app:testDebugUnitTest :app:lintDebug)"));
-    assert.ok(workflow.includes("do not regenerate an incomplete metadata file"));
-    assert.ok(workflow.includes('if [[ "${JANKTIME2_PRIVATE_DEBUG_SIGNING:-false}" == "true" ]]'));
+    assert.ok(workflow.includes("name: verification-metadata.xml"));
+    assert.ok(workflow.includes("path: companion/android/gradle/verification-metadata.xml"));
+    assert.ok(workflow.includes("name: gradle.lockfile"));
+    assert.ok(workflow.includes("path: companion/android/app/gradle.lockfile"));
     assert.ok(workflow.includes("base64 --decode"));
     assert.ok(workflow.includes("name: screenshot_emery.png"));
     assert.ok(workflow.includes("name: app-debug.apk"));

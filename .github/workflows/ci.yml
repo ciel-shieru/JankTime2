@@ -292,13 +292,36 @@ jobs:
             ./companion/android/gradlew -p companion/android --no-daemon \
               --write-verification-metadata sha256 --write-locks "${android_tasks[@]}"
           else
-            # Without private signing, do not regenerate an incomplete metadata file
-            # from test/lint tasks alone. Validate against the committed full pin.
-            ./companion/android/gradlew -p companion/android --no-daemon "${android_tasks[@]}"
+            # One-time bootstrap only: generate the missing committed candidates from
+            # the exact task graph we can validate without private signing credentials.
+            # The existing digest gate intentionally fails until these files/digests
+            # are reviewed and committed; no APK is assembled or uploaded.
+            ./companion/android/gradlew -p companion/android --no-daemon \
+              --write-verification-metadata sha256 --write-locks "${android_tasks[@]}"
           fi
           sha256sum --check tooling/gradle-dependency-pins.sha256
           # This invocation uses Gradle's existing strict artifact and metadata verification.
           ./companion/android/gradlew -p companion/android --no-daemon "${android_tasks[@]}"
+
+      - name: Upload candidate Gradle verification metadata for review
+        if: failure() && env.JANKTIME2_PRIVATE_DEBUG_SIGNING == 'false'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: verification-metadata.xml
+          path: companion/android/gradle/verification-metadata.xml
+          archive: false
+          if-no-files-found: warn
+          retention-days: 3
+
+      - name: Upload candidate Gradle dependency lock for review
+        if: failure() && env.JANKTIME2_PRIVATE_DEBUG_SIGNING == 'false'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: gradle.lockfile
+          path: companion/android/app/gradle.lockfile
+          archive: false
+          if-no-files-found: warn
+          retention-days: 3
 
       - name: Report debug APK assembly skipped
         if: success() && env.JANKTIME2_PRIVATE_DEBUG_SIGNING == 'false'
