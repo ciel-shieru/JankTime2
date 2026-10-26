@@ -71,6 +71,8 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(renderer.includes("drawBattery(143, 4, 26"));
     assert.ok(renderer.includes("drawBattery(172, 4, 26"));
     assert.ok(renderer.includes("drawBluetooth(136, statusCenterY"));
+    assert.ok(renderer.includes("const timeRight = 116"));
+    assert.ok(renderer.includes("drawAlarm(timeRight + 8, statusCenterY, alarmColor)"), "Alarm glyph must sit immediately before Bluetooth in the right-justified status cluster.");
     assert.ok(renderer.includes("const statusCenterY = 10"));
     assert.ok(renderer.includes("planetTop = 62"));
     assert.ok(renderer.includes('rows.some((row) => row.includes("1"))'), "An empty image should keep the framed image cell instead of clearing the frame.");
@@ -110,6 +112,10 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD"));
     assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD"));
     assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_KEY_ALIAS"));
+    assert.ok(workflow.includes("JANKTIME2_PRIVATE_DEBUG_SIGNING=false"));
+    assert.ok(workflow.includes("JANKTIME2_PRIVATE_DEBUG_SIGNING=true"));
+    assert.ok(workflow.includes("env.JANKTIME2_PRIVATE_DEBUG_SIGNING == 'true'"));
+    assert.ok(workflow.includes("android_tasks=(:app:testDebugUnitTest :app:lintDebug)"));
     assert.ok(workflow.includes("base64 --decode"));
     assert.ok(workflow.includes("name: screenshot_emery.png"));
     assert.ok(workflow.includes("name: app-debug.apk"));

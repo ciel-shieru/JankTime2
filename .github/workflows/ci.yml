@@ -247,8 +247,13 @@ jobs:
           ANDROID_DEBUG_KEYSTORE_KEY_ALIAS: ${{ secrets.ANDROID_DEBUG_KEYSTORE_KEY_ALIAS }}
         run: |
           set -euo pipefail
+          if [[ -z "${ANDROID_DEBUG_KEYSTORE_BASE64:-}" && -z "${ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD:-}" && -z "${ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD:-}" && -z "${ANDROID_DEBUG_KEYSTORE_KEY_ALIAS:-}" ]]; then
+            echo "JANKTIME2_PRIVATE_DEBUG_SIGNING=false" >> "$GITHUB_ENV"
+            echo "::warning::Debug signing secrets are not configured. Tests and lint will run, but APK assembly and artifact upload are skipped until all four Actions secrets are configured."
+            exit 0
+          fi
           if [[ -z "${ANDROID_DEBUG_KEYSTORE_BASE64:-}" || -z "${ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD:-}" || -z "${ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD:-}" || -z "${ANDROID_DEBUG_KEYSTORE_KEY_ALIAS:-}" ]]; then
-            echo "Required CI debug-keystore secrets are missing." >&2
+            echo "Only some CI debug-keystore secrets are configured; provide all four or none." >&2
             exit 1
           fi
           umask 077
@@ -257,6 +262,7 @@ jobs:
           test -s "$HOME/.android/debug.keystore"
           chmod 0600 "$HOME/.android/debug.keystore"
           echo "ANDROID_DEBUG_KEYSTORE_PATH=$HOME/.android/debug.keystore" >> "$GITHUB_ENV"
+          echo "JANKTIME2_PRIVATE_DEBUG_SIGNING=true" >> "$GITHUB_ENV"
 
       - name: Verify Android dependency pins and enforce Gradle checksums
         shell: bash
@@ -273,16 +279,25 @@ jobs:
           # SHA-256 pins are committed in tooling/gradle-dependency-pins.sha256.
           # Fail before the separate strict build if dependency metadata or lock
           # content diverges from the reviewed pins.
+          if [[ "${JANKTIME2_PRIVATE_DEBUG_SIGNING:-false}" == "true" ]]; then
+            android_tasks=(:app:testDebugUnitTest :app:lintDebug :app:assembleDebug)
+          else
+            # Validate Kotlin compilation, tests and lint without creating an APK
+            # signed by an unconfigured runner-default debug key.
+            android_tasks=(:app:testDebugUnitTest :app:lintDebug)
+          fi
           ./companion/android/gradlew -p companion/android --no-daemon \
-            --write-verification-metadata sha256 --write-locks \
-            :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+            --write-verification-metadata sha256 --write-locks "${android_tasks[@]}"
           sha256sum --check tooling/gradle-dependency-pins.sha256
           # This invocation uses Gradle's strict artifact and metadata verification.
-          ./companion/android/gradlew -p companion/android --no-daemon \
-            :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+          ./companion/android/gradlew -p companion/android --no-daemon "${android_tasks[@]}"
+
+      - name: Report debug APK assembly skipped
+        if: success() && env.JANKTIME2_PRIVATE_DEBUG_SIGNING == 'false'
+        run: echo "::warning::No APK was assembled or uploaded because the private CI debug keystore secrets are not configured."
 
       - name: Upload debug APK for integration testing
-        if: success()
+        if: success() && env.JANKTIME2_PRIVATE_DEBUG_SIGNING == 'true'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: app-debug.apk

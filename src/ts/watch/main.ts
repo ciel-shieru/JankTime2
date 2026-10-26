@@ -279,11 +279,11 @@ function drawStatus(date: Date): void {
     const bedtime = displayState.alarmTime !== null
         ? displayState.alarmIsBedtime
         : PREVIEW_MODE && previewBedtimeAt !== null && previewBedtimeAt.getTime() < previewAlarmAt.getTime();
-    const timeRight = 129;
+    const timeRight = 116;
     const timeLeft = timeRight - render.getTextWidth(alarmTime, statusFont);
     const alarmColor = alarmTime === "--:--" ? red : black;
-    if (bedtime) drawMdiGlyph(timeLeft - 8, statusCenterY, blue, "moon-waning-crescent", 10, 10);
-    else drawAlarm(timeLeft - 8, statusCenterY, alarmColor);
+    if (bedtime) drawMdiGlyph(timeRight + 8, statusCenterY, blue, "moon-waning-crescent", 10, 10);
+    else drawAlarm(timeRight + 8, statusCenterY, alarmColor);
     drawTextCenteredAtY(alarmTime, statusFont, black, timeLeft, statusCenterY);
 
     // The PebbleKit connection is the authoritative live phone/watch connection state.

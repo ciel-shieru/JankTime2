@@ -46,6 +46,11 @@ check(ci.includes('printf \'%s\' "$ANDROID_DEBUG_KEYSTORE_BASE64" | base64 --dec
   "CI must decode the configured debug keystore into ~/.android/debug.keystore without logging its contents.");
 check(!/echo\s+["']?\$ANDROID_DEBUG_KEYSTORE_(?:BASE64|STORE_PASSWORD|KEY_PASSWORD|KEY_ALIAS)\b/.test(ci),
   "CI must never echo debug keystore secrets.");
+check(ci.includes("JANKTIME2_PRIVATE_DEBUG_SIGNING=false") &&
+  ci.includes("JANKTIME2_PRIVATE_DEBUG_SIGNING=true") &&
+  ci.includes("env.JANKTIME2_PRIVATE_DEBUG_SIGNING == 'true'") &&
+  ci.includes("android_tasks=(:app:testDebugUnitTest :app:lintDebug)"),
+  "CI must never build or distribute a runner-default-signed debug APK when the private debug signing secrets are absent.");
 check(!/^\s*path:\s+artifacts\/\s*$/m.test(ci),
   "CI must upload screenshot and diagnostic files individually, not as a directory bundle.");
 check(ci.includes("name: screenshot_emery.png") && ci.includes("path: artifacts/screenshot_emery.png") &&
