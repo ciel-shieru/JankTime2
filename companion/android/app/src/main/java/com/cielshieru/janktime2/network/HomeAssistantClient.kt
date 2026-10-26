@@ -89,8 +89,10 @@ class HomeAssistantClient {
         val translated = if (attribute.isBlank()) {
             // Prefer the actual translated state from HA; use any translated value already
             // carried by the response as a fallback before displaying the raw state.
-            runCatching { fetchTranslatedState(baseUrl, token, entityId) }.getOrNull()
-                ?: state.translatedState
+            preferredTranslatedClimateState(
+                runCatching { fetchTranslatedState(baseUrl, token, entityId) }.getOrNull(),
+                state.translatedState,
+            )
         } else null
         val attributeValue = if (attribute.isBlank() || attribute == "state") null else state.attributes.opt(attribute)
         return resolveClimateDisplayValue(state.state, attribute, translated, attributeValue)
@@ -154,6 +156,9 @@ internal fun weatherFromValues(
         rainChancePercent = forecast?.rainChancePercent,
     )
 }
+
+internal fun preferredTranslatedClimateState(templateTranslation: String?, responseTranslation: String?): String? =
+    templateTranslation?.takeIf { it.isNotBlank() } ?: responseTranslation?.takeIf { it.isNotBlank() }
 
 internal fun resolveClimateDisplayValue(
     rawState: String,

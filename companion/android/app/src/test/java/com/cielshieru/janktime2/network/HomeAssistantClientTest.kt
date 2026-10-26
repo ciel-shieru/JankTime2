@@ -35,6 +35,14 @@ class HomeAssistantClientTest {
     }
 
     @Test
+    fun climateTranslationPrefersTemplateResultThenStateResponse() {
+        assertEquals("Heating", preferredTranslatedClimateState("Heating", "heat"))
+        assertEquals("Cooling", preferredTranslatedClimateState(null, "Cooling"))
+        assertEquals("Cooling", preferredTranslatedClimateState("", "Cooling"))
+        assertNull(preferredTranslatedClimateState(null, ""))
+    }
+
+    @Test
     fun blankClimateAttributeUsesTranslatedStateAndFallsBackToRawState() {
         assertEquals("Heating", resolveClimateDisplayValue("heat", "", "Heating"))
         assertEquals("heat", resolveClimateDisplayValue("heat", ""))
