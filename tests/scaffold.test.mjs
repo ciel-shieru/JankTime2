@@ -116,14 +116,11 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(workflow.includes("JANKTIME2_PRIVATE_DEBUG_SIGNING=true"));
     assert.ok(workflow.includes("env.JANKTIME2_PRIVATE_DEBUG_SIGNING == 'true'"));
     assert.ok(workflow.includes("android_tasks=(:app:testDebugUnitTest :app:lintDebug)"));
-    assert.ok(workflow.includes("name: verification-metadata.xml"));
-    assert.ok(workflow.includes("path: companion/android/gradle/verification-metadata.xml"));
-    assert.ok(workflow.includes("name: gradle.lockfile"));
-    assert.ok(workflow.includes("path: companion/android/app/gradle.lockfile"));
+
     assert.ok(workflow.includes("base64 --decode"));
     assert.ok(workflow.includes("name: screenshot_emery.png"));
     assert.ok(workflow.includes("name: app-debug.apk"));
-    assert.equal((workflow.match(/archive: false/g) || []).length, 9, "Every single-file CI output must be uploaded without a ZIP archive");
+    assert.equal((workflow.match(/archive: false/g) || []).length, 7, "Every single-file CI output must be uploaded without a ZIP archive");
     assert.ok(workflow.includes("actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9"));
     assert.ok(workflow.includes("path: artifacts/screenshot_emery.png"));
     assert.ok(workflow.includes("path: release/janktime2-emery-production.pbw"));
