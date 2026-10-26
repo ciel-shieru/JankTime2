@@ -11,6 +11,9 @@ This is the phone-side bridge for the JankTime2 emery watchface. It is a standal
 - The Wakey-SITizen provider is called only after the user explicitly pairs with its opt-in, read-only export.
 - The companion sends bounded display values, stale flags, and row text—not full API responses or credentials—to the watch.
 
+The temporary receiver-diagnostics branch additionally sends bounded diagnostic snapshots from the watch to the native companion using AppMessage. The branch-only listener accepts a fixed diagnostic message type and filters outcome, slot, and metric identifiers against enums before logging. It never logs arbitrary dictionary contents. Do not carry this temporary listener/reverse channel into the normal branch without a separate architecture and security review.
+
+
 ## Build
 
 Requires JDK 17 and Android SDK platform 36 / build-tools 36.0.0, as pinned and fingerprint-verified by CI.
