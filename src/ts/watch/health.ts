@@ -1,5 +1,5 @@
 declare const Natives: {
-    health_refresh(): number;
+    health_refresh(historyMinutes: number): number;
     health_metric(metric: number): number;
     health_sample_count(): number;
     health_sample(index: number): number;

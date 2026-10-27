@@ -34,7 +34,7 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(bridge, /function validMetric/);
     assert.match(bridge, /function restoreDisplayState/);
     assert.match(bridge, /function persistDisplayState/);
-    assert.match(bridge, /janktime2\\.display\\.snapshot\\.v1/);
+    assert.match(bridge, /janktime2\.display\.snapshot\.v1/);
     assert.match(bridge, /heartRateHistoryMinutes/);
     assert.match(bridge, /alarmStale/);
     assert.match(bridge, /phoneBattery/);
@@ -182,10 +182,10 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     ].sort());
     assert.match(read("../src/c/health_ffi.c"), /health_service_sum_today\(HealthMetricStepCount\)/);
     assert.match(read("../src/c/health_ffi.c"), /health_service_get_minute_history/);
-    assert.match(read("../src/c/health_ffi.c"), /health_refresh\\(int32_t history_minutes\\)/);
-    assert.match(read("../src/c/health_ffi.c"), /MAX_HEALTH_HISTORY_MINUTES \\(24 \\* 60\\)/);
-    assert.match(read("../src/ts/watch/health.ts"), /Natives\\.health_refresh\\(historyMinutes\\)/);
-    assert.match(read("../src/ts/watch/main.ts"), /readHealthSnapshot\\(historyMinutes\\)/);
+    assert.match(read("../src/c/health_ffi.c"), /health_refresh\(int32_t history_minutes\)/);
+    assert.match(read("../src/c/health_ffi.c"), /MAX_HEALTH_HISTORY_MINUTES \(24 \* 60\)/);
+    assert.match(read("../src/ts/watch/health.ts"), /Natives\.health_refresh\(historyMinutes\)/);
+    assert.match(read("../src/ts/watch/main.ts"), /readHealthSnapshot\(historyMinutes\)/);
     assert.match(read("../src/ts/watch/health.ts"), /function formatSleepMinutes/);
     assert.match(read("../src/ts/watch/health.ts"), /localStorage\.getItem/);
     assert.match(read("../src/ts/watch/health.ts"), /stepsStale: freshSteps === null/);
