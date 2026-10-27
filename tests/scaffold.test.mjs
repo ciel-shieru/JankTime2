@@ -152,11 +152,11 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.doesNotMatch(workflow, /name: janktime2-emery-screenshot-and-logs/);
     const imageStore = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/data/PixelImageStore.kt");
     assert.match(imageStore, /openTypedAssetFileDescriptor/);
-    assert.match(imageStore, /AssetFileDescriptor\\.AutoCloseInputStream/);
+    assert.match(imageStore, /AssetFileDescriptor\.AutoCloseInputStream/);
     assert.doesNotMatch(read("../companion/android/app/src/main/AndroidManifest.xml"), /READ_MEDIA_IMAGES|READ_EXTERNAL_STORAGE/);
     const wakeyClient = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/network/WakeyExportClient.kt");
     assert.match(wakeyClient, /has no upcoming alarm or bedtime/);
-    assert.match(wakeyClient, /fun read\\(token: String\\): WakeyAlarmStatus/);
+    assert.match(wakeyClient, /fun read\(token: String\): WakeyAlarmStatus/);
     assert.match(companionBridge, /heartHistoryMinutes/);
     assert.match(companionBridge, /alarmStale/);
     const gradleSigning = read("../companion/android/app/build.gradle.kts");
