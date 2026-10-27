@@ -129,6 +129,7 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(companionScreen.includes("ActivityResultContracts.OpenDocument()"));
     assert.ok(companionScreen.includes('imagePicker.launch(arrayOf("image/*"))'));
     assert.ok(companionScreen.includes("HeartRateHistory.fromHoursAndMinutes"));
+    assert.ok(companionScreen.includes("remember(config.heartRateHistoryMinutes)"));
     assert.ok(companionScreen.includes("Heart-rate graph"));
     assert.ok(companionScreen.includes("heartRateHistoryMinutes"));
     assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_BASE64"));

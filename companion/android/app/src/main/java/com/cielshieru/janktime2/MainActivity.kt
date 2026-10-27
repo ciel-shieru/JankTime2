@@ -184,10 +184,10 @@ private fun CompanionSettingsScreen(
     var pendingExportIncludesSecrets by remember { mutableStateOf(false) }
     var showImportSecretsDialog by remember { mutableStateOf(false) }
     var pendingImportedBackup by remember { mutableStateOf<ConfigBackup?>(null) }
-    var heartHistoryHours by remember(initial.heartRateHistoryMinutes) {
+    var heartHistoryHours by remember(config.heartRateHistoryMinutes) {
         mutableStateOf((initial.heartRateHistoryMinutes / 60).toString())
     }
-    var heartHistoryMinutes by remember(initial.heartRateHistoryMinutes) {
+    var heartHistoryMinutes by remember(config.heartRateHistoryMinutes) {
         mutableStateOf((initial.heartRateHistoryMinutes % 60).toString())
     }
     val scope = rememberCoroutineScope()
