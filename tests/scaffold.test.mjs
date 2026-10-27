@@ -183,6 +183,7 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     ].sort());
     assert.match(read("../src/c/health_ffi.c"), /health_service_sum_today\(HealthMetricStepCount\)/);
     assert.match(read("../src/c/health_ffi.c"), /health_service_get_minute_history/);
+    assert.match(read("../src/c/health_ffi.c"), /health_service_peek_current_value\(HealthMetricHeartRateBPM\)/);
     assert.match(read("../src/c/health_ffi.c"), /health_refresh\(int32_t history_minutes\)/);
     assert.match(read("../src/c/health_ffi.c"), /MAX_HEALTH_HISTORY_MINUTES \(24 \* 60\)/);
     assert.match(read("../src/ts/watch/health.ts"), /Natives\.health_refresh\(historyMinutes\)/);

@@ -84,9 +84,18 @@ int32_t health_refresh(int32_t history_minutes) {
     query_start = returned_end;
   }
 
+  const HealthValue current_bpm = health_service_peek_current_value(HealthMetricHeartRateBPM);
+  if (current_bpm >= 20 && current_bpm <= 240) {
+    s_metric_values[METRIC_CURRENT_HEART_RATE] = (int32_t)current_bpm;
+  }
+
   if (valid_count > 0) {
     const int32_t newest_index = valid_count - 1;
-    s_metric_values[METRIC_CURRENT_HEART_RATE] = (int32_t)s_valid_heart_rates[newest_index];
+    if (s_metric_values[METRIC_CURRENT_HEART_RATE] < 20 ||
+        s_metric_values[METRIC_CURRENT_HEART_RATE] > 240) {
+      // Use the newest history value only when HealthService has no current value.
+      s_metric_values[METRIC_CURRENT_HEART_RATE] = (int32_t)s_valid_heart_rates[newest_index];
+    }
     const int32_t output_count = valid_count < HEALTH_SAMPLE_CAPACITY
         ? valid_count : HEALTH_SAMPLE_CAPACITY;
     for (int32_t i = 0; i < output_count; i++) {
@@ -94,9 +103,6 @@ int32_t health_refresh(int32_t history_minutes) {
       s_heart_samples[i] = (int32_t)s_valid_heart_rates[source_index];
     }
     s_heart_sample_count = output_count;
-  } else {
-    const HealthValue current = health_service_peek_current_value(HealthMetricHeartRateBPM);
-    if (current >= 20 && current <= 240) s_metric_values[METRIC_CURRENT_HEART_RATE] = (int32_t)current;
   }
 #endif
 
