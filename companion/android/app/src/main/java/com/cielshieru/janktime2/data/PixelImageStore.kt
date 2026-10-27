@@ -1,12 +1,15 @@
 package com.cielshieru.janktime2.data
 
 import android.content.Context
+import android.content.ContentResolver
+import android.content.res.AssetFileDescriptor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.IOException
+import java.io.InputStream
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 
@@ -15,8 +18,7 @@ class PixelImageStore(private val context: Context) {
     fun importFromUri(uri: Uri): List<String> {
         val resolver = context.contentResolver
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        resolver.openInputStream(uri)?.use { input -> BitmapFactory.decodeStream(input, null, bounds) }
-            ?: throw IOException("Unable to open selected image.")
+        openImageStream(resolver, uri).use { input -> BitmapFactory.decodeStream(input, null, bounds) }
         val width = bounds.outWidth
         val height = bounds.outHeight
         require(width in 1..MAX_SOURCE_EDGE && height in 1..MAX_SOURCE_EDGE) {
@@ -29,8 +31,9 @@ class PixelImageStore(private val context: Context) {
         var sampleSize = 1
         while (width / sampleSize > MAX_DECODE_EDGE || height / sampleSize > MAX_DECODE_EDGE) sampleSize *= 2
         val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-        val decoded = resolver.openInputStream(uri)?.use { input -> BitmapFactory.decodeStream(input, null, options) }
-            ?: throw IOException("Unable to decode selected image.")
+        val decoded = openImageStream(resolver, uri).use { input ->
+            BitmapFactory.decodeStream(input, null, options)
+        } ?: throw IOException("Selected document does not contain a decodable image.")
 
         val cropped = centerCrop(decoded, TARGET_SIZE, TARGET_SIZE)
         val scaled = Bitmap.createScaledBitmap(cropped, TARGET_SIZE, TARGET_SIZE, true)
@@ -59,6 +62,29 @@ class PixelImageStore(private val context: Context) {
             if (cropped !== decoded && cropped !== scaled && !cropped.isRecycled) cropped.recycle()
             if (decoded !== scaled && !decoded.isRecycled) decoded.recycle()
         }
+    }
+
+    private fun openImageStream(resolver: ContentResolver, uri: Uri): InputStream {
+        var failure: IOException? = null
+        try {
+            resolver.openInputStream(uri)?.let { return it }
+            failure = IOException("Image provider returned no stream.")
+        } catch (problem: IOException) {
+            failure = problem
+        } catch (problem: UnsupportedOperationException) {
+            failure = IOException("Image provider requires typed document access.", problem)
+        }
+
+        try {
+            val descriptor = resolver.openTypedAssetFileDescriptor(uri, "image/*", null)
+            if (descriptor != null) return AssetFileDescriptor.AutoCloseInputStream(descriptor)
+            failure = IOException("Image provider returned no typed image stream.", failure)
+        } catch (problem: IOException) {
+            failure = IOException("Unable to open image through the Storage Access Framework.", problem)
+        } catch (problem: UnsupportedOperationException) {
+            failure = IOException("Image provider does not support image decoding.", problem)
+        }
+        throw IOException("Unable to open selected image.", failure)
     }
 
     fun loadRows(): List<String>? {

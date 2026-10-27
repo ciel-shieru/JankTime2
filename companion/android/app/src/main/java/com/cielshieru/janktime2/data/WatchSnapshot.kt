@@ -13,6 +13,7 @@ data class WatchSnapshot(
     val phoneBluetoothConnected: Boolean? = null,
     val alarmTime: String? = null,
     val alarmIsBedtime: Boolean = false,
+    val alarmStale: Boolean = true,
     val focusRows: List<String?> = listOf(null, null),
     val calendarRows: List<String?> = listOf(null, null),
     val currentBpm: Int? = null,
@@ -58,6 +59,7 @@ class WatchSnapshotStore(context: Context) {
         putNullable("phoneBluetoothConnected", s.phoneBluetoothConnected)
         putNullable("alarmTime", s.alarmTime)
         put("alarmIsBedtime", s.alarmIsBedtime)
+        put("alarmStale", s.alarmStale)
         put("focusRows", JSONArray(s.focusRows.map { it ?: JSONObject.NULL }))
         put("calendarRows", JSONArray(s.calendarRows.map { it ?: JSONObject.NULL }))
         putNullable("currentBpm", s.currentBpm)
@@ -110,6 +112,7 @@ class WatchSnapshotStore(context: Context) {
                 phoneBluetoothConnected = root.optBooleanOrNull("phoneBluetoothConnected"),
                 alarmTime = root.optString("alarmTime").takeIf { it.matches(Regex("(?:[01]\\\\d|2[0-3]):[0-5]\\\\d")) },
                 alarmIsBedtime = root.optBoolean("alarmIsBedtime", false),
+                alarmStale = root.optBoolean("alarmStale", true),
                 focusRows = root.arrayOfTwo("focusRows"),
                 calendarRows = root.arrayOfTwo("calendarRows"),
                 currentBpm = root.optIntOrNull("currentBpm")?.takeIf { it in 20..240 },

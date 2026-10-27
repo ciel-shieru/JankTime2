@@ -21,6 +21,7 @@ data class CompanionConfig(
     val refreshPrometheusMinutes: Int = 5,
     val refreshMindwtrMinutes: Int = 5,
     val refreshWakeyMinutes: Int = 5,
+    val heartRateHistoryMinutes: Int = HeartRateHistory.DEFAULT_MINUTES,
     val metricSlots: Map<String, String> = DEFAULT_SLOTS,
     val selectedCalendarIds: Set<String> = emptySet(),
     val calendarBlocklist: List<String> = emptyList(),
@@ -85,6 +86,9 @@ object ConfigStore {
             refreshPrometheusMinutes = refresh(prefs, "refresh.prometheus", 5),
             refreshMindwtrMinutes = refresh(prefs, "refresh.mindwtr", 5),
             refreshWakeyMinutes = refresh(prefs, "refresh.wakey", 5),
+            heartRateHistoryMinutes = HeartRateHistory.storedOrDefault(
+                prefs.getInt("heart.history.minutes", HeartRateHistory.DEFAULT_MINUTES),
+            ),
             metricSlots = slotMap,
             selectedCalendarIds = selectedIds,
             calendarBlocklist = filters,
@@ -98,6 +102,7 @@ object ConfigStore {
             refreshPrometheusMinutes = RefreshIntervals.validate(config.refreshPrometheusMinutes),
             refreshMindwtrMinutes = RefreshIntervals.validate(config.refreshMindwtrMinutes),
             refreshWakeyMinutes = RefreshIntervals.validate(config.refreshWakeyMinutes),
+            heartRateHistoryMinutes = HeartRateHistory.validate(config.heartRateHistoryMinutes),
             metricSlots = CompanionConfig.DEFAULT_SLOTS.mapValues { (slot, default) ->
                 config.metricSlots[slot]?.takeIf { it in METRIC_IDS } ?: default
             },
@@ -122,6 +127,7 @@ object ConfigStore {
             .putInt("refresh.prometheus", checked.refreshPrometheusMinutes)
             .putInt("refresh.mindwtr", checked.refreshMindwtrMinutes)
             .putInt("refresh.wakey", checked.refreshWakeyMinutes)
+            .putInt("heart.history.minutes", checked.heartRateHistoryMinutes)
             .putString(SELECTED_CALENDARS, JSONArray(checked.selectedCalendarIds.toList()).toString())
             .putString(CALENDAR_BLOCKLIST, JSONArray(checked.calendarBlocklist).toString())
         checked.metricSlots.forEach { (slot, metric) -> editor.putString(SLOT_PREFIX + slot, metric) }

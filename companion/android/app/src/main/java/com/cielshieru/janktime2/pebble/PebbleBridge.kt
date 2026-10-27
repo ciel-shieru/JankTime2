@@ -96,6 +96,8 @@ class PebbleBridge(context: Context) : AutoCloseable {
             sendMessage("status", "phoneBluetooth", if (it) "1" else "0")
         }
         sendMessage("status", "alarmTime", snapshot.alarmTime ?: "--:--", if (snapshot.alarmIsBedtime) 1 else 0)
+        sendMessage("status", "alarmStale", if (snapshot.alarmStale) "1" else "0")
+        sendMessage("status", "heartHistoryMinutes", config.heartRateHistoryMinutes.toString())
         snapshot.currentBpm?.let { sendMessage("status", "heartRate", it.toString()) }
         snapshot.heartSamples?.takeIf { it.size >= 2 }?.take(16)?.let { samples ->
             sendMessage("status", "heartSamples", samples.joinToString(","))

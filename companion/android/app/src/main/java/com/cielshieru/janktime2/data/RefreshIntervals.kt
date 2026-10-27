@@ -265,9 +265,14 @@ class SnapshotRefresher(private val context: Context) {
                 val token = credentials.get("wakey_pairing")
                 if (!token.isNullOrBlank()) {
                     val status = WakeyExportClient(context.contentResolver).read(token)
-                    snapshot = snapshot.copy(alarmTime = status?.displayTime, alarmIsBedtime = status?.isBedtime ?: false)
+                    snapshot = snapshot.copy(
+                        alarmTime = status.displayTime,
+                        alarmIsBedtime = status.isBedtime,
+                        alarmStale = false,
+                    )
                     snapshot = snapshot.succeeded("wakey", now)
                 } else {
+                    snapshot = snapshot.copy(alarmStale = true)
                     unavailableSources += "Wakey-SITizen"
                     SyncDiagnostics.warning(
                         "provider_unavailable",
@@ -284,6 +289,7 @@ class SnapshotRefresher(private val context: Context) {
                     includeStack = false,
                 )
                 unavailableSources += "Wakey-SITizen"
+                snapshot = snapshot.copy(alarmStale = true)
                 // Preserve last-known-good alarm/bedtime on failures.
             }
         }

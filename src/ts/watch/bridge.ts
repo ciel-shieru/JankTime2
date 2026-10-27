@@ -3,10 +3,15 @@ import Message from "pebble/message";
 // The Moddable XS watch runtime exposes console.log; this declaration keeps
 // the watch-only TypeScript config independent of browser/Node type libraries.
 declare const console: { log(message: string): void };
+declare const localStorage: {
+    getItem(key: string): string | null;
+    setItem(key: string, value: string): void;
+};
 import {
     DEFAULT_SLOT_CONFIGURATION,
     METRIC_IDS,
     SLOT_IDS,
+    validateSlotConfiguration,
     type MetricId,
     type SlotId,
     type SlotConfiguration,
@@ -20,6 +25,8 @@ export interface BridgeDisplayState {
     phoneBluetoothConnected: boolean | null;
     alarmTime: string | null;
     alarmIsBedtime: boolean;
+    alarmStale: boolean;
+    heartRateHistoryMinutes: number;
     focusRows: [string | null, string | null];
     calendarRows: [string | null, string | null];
     currentBpm: number | null;
@@ -36,6 +43,8 @@ export const displayState: BridgeDisplayState = {
     phoneBluetoothConnected: null,
     alarmTime: null,
     alarmIsBedtime: false,
+    alarmStale: true,
+    heartRateHistoryMinutes: 120,
     focusRows: [null, null],
     calendarRows: [null, null],
     currentBpm: null,
@@ -98,11 +107,107 @@ function parseSamples(value: unknown): number[] | null {
     }
     return result;
 }
+const DISPLAY_CACHE_KEY = "janktime2.display.snapshot.v1";
+const MAX_DISPLAY_CACHE_CHARS = 8192;
+
+function storedRows(value: unknown): [string | null, string | null] {
+    if (!Array.isArray(value)) return [null, null];
+    const first = value[0] === null ? null : asText(value[0], 200);
+    const second = value[1] === null ? null : asText(value[1], 200);
+    return [first, second];
+}
+
+function restoreDisplayState(): void {
+    try {
+        const raw = localStorage.getItem(DISPLAY_CACHE_KEY);
+        if (raw === null || raw.length === 0 || raw.length > MAX_DISPLAY_CACHE_CHARS) return;
+        const stored = JSON.parse(raw) as Record<string, unknown>;
+        if (typeof stored !== "object" || stored === null || Array.isArray(stored)) return;
+
+        displayState.slotConfiguration = validateSlotConfiguration(stored.slotConfiguration);
+
+        const values = stored.metricValues;
+        if (typeof values === "object" && values !== null && !Array.isArray(values)) {
+            const source = values as Record<string, unknown>;
+            for (const id of METRIC_IDS) {
+                if (id === "none") continue;
+                const value = asText(source[id], 160);
+                if (value !== null) displayState.metricValues[id] = value;
+            }
+        }
+
+        const stale = stored.staleMetrics;
+        if (typeof stale === "object" && stale !== null && !Array.isArray(stale)) {
+            const source = stale as Record<string, unknown>;
+            for (const id of METRIC_IDS) {
+                if (id !== "none" && typeof source[id] === "boolean") {
+                    displayState.staleMetrics[id] = source[id] as boolean;
+                }
+            }
+        }
+
+        if (stored.phoneBatteryPercent === null) displayState.phoneBatteryPercent = null;
+        else {
+            const battery = asInteger(stored.phoneBatteryPercent, 0, 100);
+            if (battery !== null) displayState.phoneBatteryPercent = battery;
+        }
+        if (stored.phoneBluetoothConnected === null || typeof stored.phoneBluetoothConnected === "boolean") {
+            displayState.phoneBluetoothConnected = stored.phoneBluetoothConnected as boolean | null;
+        }
+
+        if (stored.alarmTime === null) displayState.alarmTime = null;
+        else {
+            const time = validTime(stored.alarmTime);
+            if (time !== null) displayState.alarmTime = time;
+        }
+        if (typeof stored.alarmIsBedtime === "boolean") displayState.alarmIsBedtime = stored.alarmIsBedtime;
+        if (typeof stored.alarmStale === "boolean") displayState.alarmStale = stored.alarmStale;
+        const historyMinutes = asInteger(stored.heartRateHistoryMinutes, 5, 1440);
+        if (historyMinutes !== null) displayState.heartRateHistoryMinutes = historyMinutes;
+
+        displayState.focusRows = storedRows(stored.focusRows);
+        displayState.calendarRows = storedRows(stored.calendarRows);
+
+        if (stored.currentBpm === null) displayState.currentBpm = null;
+        else {
+            const bpm = asInteger(stored.currentBpm, 20, 240);
+            if (bpm !== null) displayState.currentBpm = bpm;
+        }
+        if (Array.isArray(stored.heartSamples) && stored.heartSamples.every(sample => typeof sample === "number")) {
+            displayState.heartSamples = parseSamples(stored.heartSamples.join(","));
+        } else if (stored.heartSamples === null) {
+            displayState.heartSamples = null;
+        }
+
+        displayState.weatherCondition = asText(stored.weatherCondition, 40)?.toLowerCase() ?? null;
+        if (Array.isArray(stored.imageRows) && stored.imageRows.length === 30 &&
+            stored.imageRows.every(row => typeof row === "string" && /^[01]{30}$/.test(row))) {
+            displayState.imageRows = stored.imageRows as string[];
+        } else if (stored.imageRows === null) {
+            displayState.imageRows = null;
+        }
+    } catch {
+        // Missing/corrupt/full storage must not prevent the watchface from launching.
+    }
+}
+
+function persistDisplayState(): void {
+    try {
+        const encoded = JSON.stringify(displayState);
+        if (encoded.length <= MAX_DISPLAY_CACHE_CHARS) localStorage.setItem(DISPLAY_CACHE_KEY, encoded);
+    } catch {
+        // The live in-memory state remains usable if localStorage is unavailable.
+    }
+}
+
 function changed(): boolean {
+    persistDisplayState();
     if (redraw === null) return false;
     redraw();
     return true;
 }
+
+restoreDisplayState();
 
 function handleMessage(message: IncomingMessage): void {
     const kind = asText(message.get("TYPE"), 16);
@@ -224,6 +329,24 @@ function handleMessage(message: IncomingMessage): void {
                     return;
                 }
                 displayState.heartSamples = samples;
+                break;
+            }
+            case "heartHistoryMinutes": {
+                const minutes = asInteger(value, 5, 1440);
+                if (minutes === null) {
+                    receiverLog("status_update_rejected", "reason=invalid_heart_history_window");
+                    return;
+                }
+                displayState.heartRateHistoryMinutes = minutes;
+                break;
+            }
+            case "alarmStale": {
+                const stale = asFlag(value);
+                if (stale === null) {
+                    receiverLog("status_update_rejected", "reason=invalid_alarm_staleness");
+                    return;
+                }
+                displayState.alarmStale = stale;
                 break;
             }
             default:

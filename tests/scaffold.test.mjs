@@ -32,6 +32,11 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.match(bridge, /function validTime/);
     assert.match(bridge, /function validSlot/);
     assert.match(bridge, /function validMetric/);
+    assert.match(bridge, /function restoreDisplayState/);
+    assert.match(bridge, /function persistDisplayState/);
+    assert.match(bridge, /janktime2\\.display\\.snapshot\\.v1/);
+    assert.match(bridge, /heartRateHistoryMinutes/);
+    assert.match(bridge, /alarmStale/);
     assert.match(bridge, /phoneBattery/);
     assert.match(bridge, /heartSamples/);
     const pkg = JSON.parse(read("../package.json"));
@@ -112,6 +117,7 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(backupSource.includes("Selected calendar IDs must be a JSON array."));
     assert.ok(backupSource.includes("Calendar blocklist must be a JSON array."));
     assert.ok(backupSource.includes("imageRows"));
+    assert.ok(backupSource.includes("heartRateHistoryMinutes"));
     assert.ok(backupSource.includes("Image backup must be a 30×30 one-bit map."));
     assert.ok(backupSource.includes("validateHttpsUrl"));
     assert.ok(backupSource.includes("secrets: Map<String, String>?"));
@@ -120,6 +126,11 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.ok(companionScreen.includes("Restore included secrets"));
     assert.ok(companionScreen.includes("refreshAndSend(forceRefresh = true)"));
     assert.ok(companionScreen.includes("Import from file"));
+    assert.ok(companionScreen.includes("ActivityResultContracts.OpenDocument()"));
+    assert.ok(companionScreen.includes('imagePicker.launch(arrayOf("image/*"))'));
+    assert.ok(companionScreen.includes("HeartRateHistory.fromHoursAndMinutes"));
+    assert.ok(companionScreen.includes("Heart-rate graph"));
+    assert.ok(companionScreen.includes("heartRateHistoryMinutes"));
     assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_BASE64"));
     assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_STORE_PASSWORD"));
     assert.ok(workflow.includes("ANDROID_DEBUG_KEYSTORE_KEY_PASSWORD"));
@@ -139,6 +150,15 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     assert.doesNotMatch(workflow, /echo\s+["']?\$ANDROID_DEBUG_KEYSTORE_(?:BASE64|STORE_PASSWORD|KEY_PASSWORD|KEY_ALIAS)\b/);
     assert.doesNotMatch(workflow, /path: artifacts\/\s*$/m);
     assert.doesNotMatch(workflow, /name: janktime2-emery-screenshot-and-logs/);
+    const imageStore = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/data/PixelImageStore.kt");
+    assert.match(imageStore, /openTypedAssetFileDescriptor/);
+    assert.match(imageStore, /AssetFileDescriptor\\.AutoCloseInputStream/);
+    assert.doesNotMatch(read("../companion/android/app/src/main/AndroidManifest.xml"), /READ_MEDIA_IMAGES|READ_EXTERNAL_STORAGE/);
+    const wakeyClient = read("../companion/android/app/src/main/java/com/cielshieru/janktime2/network/WakeyExportClient.kt");
+    assert.match(wakeyClient, /has no upcoming alarm or bedtime/);
+    assert.match(wakeyClient, /fun read\\(token: String\\): WakeyAlarmStatus/);
+    assert.match(companionBridge, /heartHistoryMinutes/);
+    assert.match(companionBridge, /alarmStale/);
     const gradleSigning = read("../companion/android/app/build.gradle.kts");
     assert.ok(gradleSigning.includes('create("ciDebug")'));
     assert.ok(gradleSigning.includes('signingConfigs.getByName("ciDebug")'));
@@ -162,6 +182,10 @@ test("design contract describes eleven metric slots and reserved image cell", ()
     ].sort());
     assert.match(read("../src/c/health_ffi.c"), /health_service_sum_today\(HealthMetricStepCount\)/);
     assert.match(read("../src/c/health_ffi.c"), /health_service_get_minute_history/);
+    assert.match(read("../src/c/health_ffi.c"), /health_refresh\\(int32_t history_minutes\\)/);
+    assert.match(read("../src/c/health_ffi.c"), /MAX_HEALTH_HISTORY_MINUTES \\(24 \\* 60\\)/);
+    assert.match(read("../src/ts/watch/health.ts"), /Natives\\.health_refresh\\(historyMinutes\\)/);
+    assert.match(read("../src/ts/watch/main.ts"), /readHealthSnapshot\\(historyMinutes\\)/);
     assert.match(read("../src/ts/watch/health.ts"), /function formatSleepMinutes/);
     assert.match(read("../src/ts/watch/health.ts"), /localStorage\.getItem/);
     assert.match(read("../src/ts/watch/health.ts"), /stepsStale: freshSteps === null/);
@@ -196,6 +220,7 @@ test("all accepted architecture decisions are present", () => {
         "../docs/adr/ADR-0015-image-and-epaper-rendering.md",
         "../docs/adr/ADR-0016-font-resource-and-blank-screen-regression.md",
         "../docs/adr/ADR-0017-configuration-backup-and-secret-disclosure.md",
+        "../docs/adr/ADR-0018-heart-rate-history-and-watch-state-persistence.md",
     ]) {
         assert.ok(existsSync(new URL(path, import.meta.url)), "Missing ADR: " + path);
     }

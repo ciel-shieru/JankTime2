@@ -24,6 +24,7 @@ export interface NativeHealthSnapshot {
 
 interface HealthCache {
     day: string;
+    historyMinutes: number;
     steps: number | null;
     totalSleepMinutes: number | null;
     restfulSleepMinutes: number | null;
@@ -33,6 +34,12 @@ interface HealthCache {
 
 const CACHE_KEY = "janktime2.health.snapshot.v1";
 const MAX_SAMPLES = 16;
+const DEFAULT_HISTORY_MINUTES = 120;
+
+function validHistoryMinutes(value: unknown): number {
+    return typeof value === "number" && Number.isInteger(value) && value >= 5 && value <= 1440
+        ? value : DEFAULT_HISTORY_MINUTES;
+}
 
 function integer(value: unknown, minimum: number, maximum: number): number | null {
     return typeof value === "number" && Number.isInteger(value) && value >= minimum && value <= maximum
@@ -57,6 +64,7 @@ function readCache(): HealthCache | null {
             : [];
         return {
             day: value.day,
+            historyMinutes: validHistoryMinutes(value.historyMinutes),
             steps: integer(value.steps, 0, 100000),
             totalSleepMinutes: integer(value.totalSleepMinutes, 0, 1440),
             restfulSleepMinutes: integer(value.restfulSleepMinutes, 0, 1440),
@@ -77,16 +85,23 @@ function readMetric(id: number): number | null {
     }
 }
 
-export function readHealthSnapshot(): NativeHealthSnapshot {
+export function readHealthSnapshot(requestedHistoryMinutes: number = DEFAULT_HISTORY_MINUTES): NativeHealthSnapshot {
+    const historyMinutes = validHistoryMinutes(requestedHistoryMinutes);
     const today = dayKey(new Date());
     const previous = readCache();
-    const cache: HealthCache = previous?.day === today ? previous : {
+    const sameHistoryWindow = previous?.historyMinutes === historyMinutes;
+    const cache: HealthCache = previous?.day === today ? {
+        ...previous,
+        historyMinutes,
+        heartSamples: sameHistoryWindow ? previous.heartSamples : [],
+    } : {
         day: today,
+        historyMinutes,
         steps: null,
         totalSleepMinutes: previous?.totalSleepMinutes ?? null,
         restfulSleepMinutes: previous?.restfulSleepMinutes ?? null,
         currentBpm: previous?.currentBpm ?? null,
-        heartSamples: previous?.heartSamples ?? [],
+        heartSamples: sameHistoryWindow ? previous?.heartSamples ?? [] : [],
     };
     let freshSteps: number | null = null;
     let freshTotalSleep: number | null = null;
@@ -95,7 +110,7 @@ export function readHealthSnapshot(): NativeHealthSnapshot {
     const freshSamples: number[] = [];
 
     try {
-        Natives.health_refresh();
+        Natives.health_refresh(historyMinutes);
         freshSteps = readMetric(0);
         freshTotalSleep = readMetric(1);
         freshRestfulSleep = readMetric(2);
@@ -112,6 +127,7 @@ export function readHealthSnapshot(): NativeHealthSnapshot {
     const heartSamplesFresh = freshSamples.length >= 2;
     const snapshot: HealthCache = {
         day: today,
+        historyMinutes,
         steps: freshSteps ?? cache.steps,
         totalSleepMinutes: freshTotalSleep ?? cache.totalSleepMinutes,
         restfulSleepMinutes: freshRestfulSleep ?? cache.restfulSleepMinutes,

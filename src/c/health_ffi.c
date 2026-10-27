@@ -5,7 +5,9 @@
 
 #define HEALTH_SAMPLE_CAPACITY 16
 #define HEALTH_HISTORY_RECORDS 120
-#define HEALTH_LOOKBACK_SECONDS (2 * 60 * 60)
+#define DEFAULT_HEALTH_HISTORY_MINUTES 120
+#define MIN_HEALTH_HISTORY_MINUTES 5
+#define MAX_HEALTH_HISTORY_MINUTES (24 * 60)
 
 enum {
   METRIC_STEP_COUNT = 0,
@@ -17,9 +19,10 @@ enum {
 static int32_t s_metric_values[4] = { -1, -1, -1, -1 };
 static int32_t s_heart_samples[HEALTH_SAMPLE_CAPACITY];
 static int32_t s_heart_sample_count = 0;
+static uint8_t s_valid_heart_rates[MAX_HEALTH_HISTORY_MINUTES];
 static HealthMinuteData s_history[HEALTH_HISTORY_RECORDS];
 
-int32_t health_refresh(void) {
+int32_t health_refresh(int32_t history_minutes) {
   s_metric_values[METRIC_STEP_COUNT] = -1;
   s_metric_values[METRIC_TOTAL_SLEEP_MINUTES] = -1;
   s_metric_values[METRIC_RESTFUL_SLEEP_MINUTES] = -1;
@@ -50,28 +53,45 @@ int32_t health_refresh(void) {
     if (seconds >= 0) s_metric_values[METRIC_RESTFUL_SLEEP_MINUTES] = (int32_t)((seconds + 30) / 60);
   }
 
-  time_t history_start = now - HEALTH_LOOKBACK_SECONDS;
-  time_t history_end = now;
-  const uint32_t history_count = health_service_get_minute_history(
-      s_history, HEALTH_HISTORY_RECORDS, &history_start, &history_end);
+  if (history_minutes < MIN_HEALTH_HISTORY_MINUTES ||
+      history_minutes > MAX_HEALTH_HISTORY_MINUTES) {
+    history_minutes = DEFAULT_HEALTH_HISTORY_MINUTES;
+  }
+
+  // Query chronologically with a fixed work buffer. HealthService updates the
+  // returned end timestamp to the end of the last record; resume there to avoid
+  // allocating a full 24-hour HealthMinuteData array.
+  const time_t history_end = now;
+  time_t query_start = history_end - ((time_t)history_minutes * 60);
   int32_t valid_count = 0;
-  for (uint32_t i = 0; i < history_count && i < HEALTH_HISTORY_RECORDS; i++) {
-    if (s_history[i].is_invalid) continue;
-    const int32_t bpm = (int32_t)s_history[i].heart_rate_bpm;
-    if (bpm < 20 || bpm > 240) continue;
-    // Compact valid values in place; destination is never ahead of source.
-    s_history[valid_count].heart_rate_bpm = (uint8_t)bpm;
-    valid_count++;
+  while (query_start < history_end && valid_count < history_minutes) {
+    const time_t previous_start = query_start;
+    time_t returned_start = query_start;
+    time_t returned_end = history_end;
+    const uint32_t history_count = health_service_get_minute_history(
+        s_history, HEALTH_HISTORY_RECORDS, &returned_start, &returned_end);
+    if (history_count == 0) break;
+
+    for (uint32_t i = 0; i < history_count && i < HEALTH_HISTORY_RECORDS &&
+         valid_count < history_minutes; i++) {
+      if (s_history[i].is_invalid) continue;
+      const int32_t bpm = (int32_t)s_history[i].heart_rate_bpm;
+      if (bpm < 20 || bpm > 240) continue;
+      s_valid_heart_rates[valid_count++] = (uint8_t)bpm;
+    }
+
+    if (returned_end <= previous_start) break;
+    query_start = returned_end;
   }
 
   if (valid_count > 0) {
     const int32_t newest_index = valid_count - 1;
-    s_metric_values[METRIC_CURRENT_HEART_RATE] = (int32_t)s_history[newest_index].heart_rate_bpm;
+    s_metric_values[METRIC_CURRENT_HEART_RATE] = (int32_t)s_valid_heart_rates[newest_index];
     const int32_t output_count = valid_count < HEALTH_SAMPLE_CAPACITY
         ? valid_count : HEALTH_SAMPLE_CAPACITY;
     for (int32_t i = 0; i < output_count; i++) {
       const int32_t source_index = output_count == 1 ? newest_index : (i * newest_index) / (output_count - 1);
-      s_heart_samples[i] = (int32_t)s_history[source_index].heart_rate_bpm;
+      s_heart_samples[i] = (int32_t)s_valid_heart_rates[source_index];
     }
     s_heart_sample_count = output_count;
   } else {

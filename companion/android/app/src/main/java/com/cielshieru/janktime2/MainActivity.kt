@@ -40,6 +40,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -47,6 +49,7 @@ import com.cielshieru.janktime2.config.CompanionConfig
 import com.cielshieru.janktime2.config.ConfigBackup
 import com.cielshieru.janktime2.config.ConfigBackupCodec
 import com.cielshieru.janktime2.config.ConfigStore
+import com.cielshieru.janktime2.config.HeartRateHistory
 import com.cielshieru.janktime2.config.RegexFilter
 import com.cielshieru.janktime2.config.RefreshIntervals
 import com.cielshieru.janktime2.data.CalendarReader
@@ -181,8 +184,14 @@ private fun CompanionSettingsScreen(
     var pendingExportIncludesSecrets by remember { mutableStateOf(false) }
     var showImportSecretsDialog by remember { mutableStateOf(false) }
     var pendingImportedBackup by remember { mutableStateOf<ConfigBackup?>(null) }
+    var heartHistoryHours by remember(initial.heartRateHistoryMinutes) {
+        mutableStateOf((initial.heartRateHistoryMinutes / 60).toString())
+    }
+    var heartHistoryMinutes by remember(initial.heartRateHistoryMinutes) {
+        mutableStateOf((initial.heartRateHistoryMinutes % 60).toString())
+    }
     val scope = rememberCoroutineScope()
-    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
             runCatching { onChooseImage(uri) }
                 .onSuccess { notice = "Image resized to 30×30 and queued for transfer." }
@@ -411,6 +420,37 @@ private fun CompanionSettingsScreen(
             config = config.copy(refreshWakeyMinutes = it)
         })
 
+        Text("Heart-rate graph", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Display heart-rate measurements from the past 5 minutes up to 24 hours. The graph keeps its compact 16-point display while the selected window controls the source history.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = heartHistoryHours,
+                onValueChange = { raw -> if (raw.length <= 2 && raw.all(Char::isDigit)) heartHistoryHours = raw },
+                label = { Text("Hours (0–24)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedTextField(
+                value = heartHistoryMinutes,
+                onValueChange = { raw -> if (raw.length <= 2 && raw.all(Char::isDigit)) heartHistoryMinutes = raw },
+                label = { Text("Minutes (0–59)") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                singleLine = true,
+                modifier = Modifier.weight(1f),
+            )
+        }
+        Text(
+            "Enter both fields. Allowed range is 00:05 through 24:00; the default is 02:00.",
+            style = MaterialTheme.typography.bodySmall,
+        )
+
         Text("Phone calendars", style = MaterialTheme.typography.titleMedium)
         Text("Grant calendar permission in Android settings before selecting calendars.")
         Button(onClick = {
@@ -455,7 +495,7 @@ private fun CompanionSettingsScreen(
         )
 
         Text("Image", style = MaterialTheme.typography.titleMedium)
-        Button(onClick = { imagePicker.launch("image/*") }) {
+        Button(onClick = { imagePicker.launch(arrayOf("image/*")) }) {
             Text("Choose and resize image")
         }
         Text("The phone center-crops and downsizes to 30×30 pixels before transfer.")
@@ -465,13 +505,18 @@ private fun CompanionSettingsScreen(
                 scope.launch {
                     var saved = false
                     try {
-                        RefreshIntervals.validate(config.refreshHomeAssistantMinutes)
-                        RefreshIntervals.validate(config.refreshPrometheusMinutes)
-                        RefreshIntervals.validate(config.refreshMindwtrMinutes)
-                        RefreshIntervals.validate(config.refreshWakeyMinutes)
-                        RegexFilter.validate(config.calendarBlocklist)
+                        val historyMinutes = HeartRateHistory.fromHoursAndMinutes(
+                            heartHistoryHours.toIntOrNull() ?: -1,
+                            heartHistoryMinutes.toIntOrNull() ?: -1,
+                        )
+                        val savedConfig = config.copy(heartRateHistoryMinutes = historyMinutes)
+                        RefreshIntervals.validate(savedConfig.refreshHomeAssistantMinutes)
+                        RefreshIntervals.validate(savedConfig.refreshPrometheusMinutes)
+                        RefreshIntervals.validate(savedConfig.refreshMindwtrMinutes)
+                        RefreshIntervals.validate(savedConfig.refreshWakeyMinutes)
+                        RegexFilter.validate(savedConfig.calendarBlocklist)
                         onSave(
-                            config,
+                            savedConfig,
                             mapOf(
                                 "home_assistant" to secrets.homeAssistant,
                                 "prometheus" to secrets.prometheus,
@@ -479,6 +524,7 @@ private fun CompanionSettingsScreen(
                                 "wakey_pairing" to secrets.wakeyPairing,
                             ),
                         )
+                        config = savedConfig
                         saved = true
                         notice = "Configuration saved. Refreshing providers and updating the watch…"
                         notice = "Configuration saved. " + onRefresh()

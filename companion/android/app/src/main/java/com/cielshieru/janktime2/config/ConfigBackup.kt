@@ -27,7 +27,8 @@ object ConfigBackupCodec {
         "homeAssistantUrl", "sensorEntity", "genericSensorEntity", "waterEntity", "weatherEntity",
         "climateEntity", "climateAttribute", "prometheusUrl", "cpuQuery", "memoryQuery", "alertQuery",
         "mindwtrUrl", "refreshHomeAssistantMinutes", "refreshPrometheusMinutes", "refreshMindwtrMinutes",
-        "refreshWakeyMinutes", "metricSlots", "selectedCalendarIds", "calendarBlocklist", "calendarTodayOnly",
+        "refreshWakeyMinutes", "heartRateHistoryMinutes", "metricSlots", "selectedCalendarIds",
+        "calendarBlocklist", "calendarTodayOnly",
     )
 
     fun encode(
@@ -57,6 +58,7 @@ object ConfigBackupCodec {
                 put("refreshPrometheusMinutes", config.refreshPrometheusMinutes)
                 put("refreshMindwtrMinutes", config.refreshMindwtrMinutes)
                 put("refreshWakeyMinutes", config.refreshWakeyMinutes)
+                put("heartRateHistoryMinutes", config.heartRateHistoryMinutes)
                 put("metricSlots", JSONObject().apply {
                     CompanionConfig.DEFAULT_SLOTS.keys.sorted().forEach { slot ->
                         put(slot, config.metricSlots[slot] ?: CompanionConfig.DEFAULT_SLOTS.getValue(slot))
@@ -149,6 +151,10 @@ object ConfigBackupCodec {
             }
         }
         val calendarTodayOnly = decodeCalendarTodayOnly(c.has("calendarTodayOnly"), c.opt("calendarTodayOnly"))
+        val heartRateHistoryMinutes = HeartRateHistory.decodeBackupValue(
+            c.has("heartRateHistoryMinutes"),
+            c.opt("heartRateHistoryMinutes"),
+        )
         val config = CompanionConfig(
             homeAssistantUrl = string("homeAssistantUrl", max = 2048),
             sensorEntity = string("sensorEntity", max = 255),
@@ -166,6 +172,7 @@ object ConfigBackupCodec {
             refreshPrometheusMinutes = interval("refreshPrometheusMinutes", 5),
             refreshMindwtrMinutes = interval("refreshMindwtrMinutes", 5),
             refreshWakeyMinutes = interval("refreshWakeyMinutes", 5),
+            heartRateHistoryMinutes = heartRateHistoryMinutes,
             metricSlots = slots,
             selectedCalendarIds = calendarIds,
             calendarBlocklist = RegexFilter.validate(filters),
@@ -221,6 +228,7 @@ object ConfigBackupCodec {
             config.refreshPrometheusMinutes in 1..60 &&
             config.refreshMindwtrMinutes in 1..60 &&
             config.refreshWakeyMinutes in 1..60) { "Refresh intervals must be from 1 to 60 minutes." }
+        HeartRateHistory.validate(config.heartRateHistoryMinutes)
         require(config.metricSlots.keys.all { it in CompanionConfig.DEFAULT_SLOTS } &&
             config.metricSlots.values.all { it in metricIds }) { "Metric slot configuration is invalid." }
         require(RegexFilter.validate(config.calendarBlocklist).size <= 10) { "Calendar blocklist is invalid." }

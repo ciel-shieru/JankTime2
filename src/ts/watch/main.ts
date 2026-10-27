@@ -167,13 +167,16 @@ let nativeHealth: NativeHealthSnapshot = {
     heartSamplesStale: true,
 };
 let lastHealthMinute = -1;
+let lastHealthHistoryMinutes = -1;
 
 function refreshHealthForMinute(date: Date): void {
     if (PREVIEW_MODE) return;
     const key = Math.floor(date.getTime() / 60000);
-    if (key === lastHealthMinute) return;
+    const historyMinutes = displayState.heartRateHistoryMinutes;
+    if (key === lastHealthMinute && historyMinutes === lastHealthHistoryMinutes) return;
     lastHealthMinute = key;
-    nativeHealth = readHealthSnapshot();
+    lastHealthHistoryMinutes = historyMinutes;
+    nativeHealth = readHealthSnapshot(historyMinutes);
 }
 
 function nativeHealthMetric(metric: MetricId): { value: string; stale: boolean } | null {
@@ -290,9 +293,10 @@ function drawStatus(date: Date): void {
     const alarmCenterX = bluetoothCenterX - 7;
     const timeRight = alarmCenterX - 6;
     const timeLeft = timeRight - render.getTextWidth(alarmTime, statusFont);
-    const alarmColor = alarmTime === "--:--" ? red : black;
+    const alarmStale = alarmTime === "--:--" || displayState.alarmStale;
+    const alarmColor = alarmStale ? red : black;
 
-    if (bedtime) drawMdiGlyph(alarmCenterX, statusCenterY, blue, "moon-waning-crescent", 10, 10);
+    if (bedtime) drawMdiGlyph(alarmCenterX, statusCenterY, alarmStale ? red : blue, "moon-waning-crescent", 10, 10);
     else drawAlarm(alarmCenterX, statusCenterY, alarmColor);
     drawTextCenteredAtY(alarmTime, statusFont, black, timeLeft, statusCenterY);
 
