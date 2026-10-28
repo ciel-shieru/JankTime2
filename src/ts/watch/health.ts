@@ -15,6 +15,8 @@ export interface NativeHealthSnapshot {
     readonly restfulSleepMinutes: number | null;
     readonly currentBpm: number | null;
     readonly heartSamples: number[];
+    readonly isSleeping: boolean;
+    readonly sleepStateStale: boolean;
     readonly stepsStale: boolean;
     readonly totalSleepStale: boolean;
     readonly restfulSleepStale: boolean;
@@ -52,7 +54,12 @@ function dayKey(date: Date): string {
         String(date.getDate()).padStart(2, "0");
 }
 
+let cacheLoaded = false;
+let memoryCache: HealthCache | null = null;
+
 function readCache(): HealthCache | null {
+    if (cacheLoaded) return memoryCache;
+    cacheLoaded = true;
     try {
         const raw = localStorage.getItem(CACHE_KEY);
         if (!raw || raw.length > 1024) return null;
@@ -62,7 +69,7 @@ function readCache(): HealthCache | null {
             ? value.heartSamples.slice(0, MAX_SAMPLES).filter((n): n is number =>
                 typeof n === "number" && Number.isInteger(n) && n >= 20 && n <= 240)
             : [];
-        return {
+        memoryCache = {
             day: value.day,
             historyMinutes: validHistoryMinutes(value.historyMinutes),
             steps: integer(value.steps, 0, 100000),
@@ -71,6 +78,7 @@ function readCache(): HealthCache | null {
             currentBpm: integer(value.currentBpm, 20, 240),
             heartSamples: samples,
         };
+        return memoryCache;
     } catch {
         return null;
     }
@@ -80,6 +88,17 @@ function readMetric(id: number): number | null {
     try {
         const value = Natives.health_metric(id);
         return Number.isFinite(value) && value >= 0 ? Math.trunc(value) : null;
+    } catch {
+        return null;
+    }
+}
+
+function readSleepState(): boolean | null {
+    try {
+        const value = Natives.health_metric(4);
+        if (value === 0) return false;
+        if (value === 1) return true;
+        return null;
     } catch {
         return null;
     }
@@ -107,10 +126,12 @@ export function readHealthSnapshot(requestedHistoryMinutes: number = DEFAULT_HIS
     let freshTotalSleep: number | null = null;
     let freshRestfulSleep: number | null = null;
     let freshBpm: number | null = null;
+    let freshSleepState: boolean | null = null;
     const freshSamples: number[] = [];
 
     try {
         Natives.health_refresh(historyMinutes);
+        freshSleepState = readSleepState();
         freshSteps = readMetric(0);
         freshTotalSleep = readMetric(1);
         freshRestfulSleep = readMetric(2);
@@ -134,15 +155,23 @@ export function readHealthSnapshot(requestedHistoryMinutes: number = DEFAULT_HIS
         currentBpm: freshBpm ?? freshSamples[freshSamples.length - 1] ?? cache.currentBpm,
         heartSamples: (heartSamplesFresh ? freshSamples : cache.heartSamples).slice(-MAX_SAMPLES),
     };
-    try {
-        const encoded = JSON.stringify(snapshot);
-        if (encoded.length <= 1024) localStorage.setItem(CACHE_KEY, encoded);
-    } catch {
-        // Current-session values remain usable when persistent storage is unavailable.
+    memoryCache = snapshot;
+    cacheLoaded = true;
+    // Flash-backed localStorage is write-throttled while sleeping. Values remain
+    // available in memory and are persisted again after a fresh awake state.
+    if (freshSleepState !== true) {
+        try {
+            const encoded = JSON.stringify(snapshot);
+            if (encoded.length <= 1024) localStorage.setItem(CACHE_KEY, encoded);
+        } catch {
+            // Current-session values remain usable when persistent storage is unavailable.
+        }
     }
 
     return {
         ...snapshot,
+        isSleeping: freshSleepState === true,
+        sleepStateStale: freshSleepState === null,
         stepsStale: freshSteps === null,
         totalSleepStale: freshTotalSleep === null,
         restfulSleepStale: freshRestfulSleep === null,

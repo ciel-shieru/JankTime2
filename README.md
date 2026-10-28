@@ -37,6 +37,12 @@ The large center clock shows HH:mm only. Around it, the side slots remain indepe
 
 Draw the watch's heart-rate data above the two focus rows and two calendar rows. Show current BPM and a compact graph with minimum/maximum values for the displayed graph window. The screenshot values 72 and 54/92 are examples/placeholders only, not constants. Historical heart-rate data and sleep totals must come from Pebble Health data rather than fabricated values.
 
+### Sleep-triggered low-power mode
+
+When the on-watch Pebble Health activity state reports either sleep or restful sleep, the watchface switches to a local-only display. It shows the local date and HH:mm clock, watch battery, current heart rate and its graph/range, total sleep, and restful sleep. Total sleep moves to the metric position immediately left of the clock; restful sleep moves to the position immediately right of the clock. Both use watch-local HealthService values.
+
+Low-power mode hides the phone battery, Bluetooth and alarm/bedtime status, configurable/remote metrics, uploaded image, focus rows, and calendar rows. Incoming phone messages are ignored while the mode is active, and the watch avoids display-state storage writes and unnecessary redraws. The mode is checked at the normal minute cadence; unavailable sleep-state data falls back to normal mode. Detection is based only on Pebble Health activity state, not wrist detection. Normal-mode layout and metric assignments are unchanged.
+
 ### Focus items and calendar lines
 
 Reserve two lines for the next two Mindwtr items explicitly starred as today's focus items. Render each as:

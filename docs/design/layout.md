@@ -57,3 +57,18 @@ The second-row center image cell is framed and approximately square. The impleme
 ## Heart-rate graph
 
 The graph is for Pebble heart-rate samples, not Prometheus. Current BPM and the minimum/maximum label are derived from the samples represented by the graph. The screenshot's 72 and 54/92 are illustrative values. The graph window and rendering downsampling must be bounded by the watch's memory budget.
+
+
+## Sleep-triggered low-power mode
+
+The normal layout above remains unchanged when Pebble Health does not report sleep.
+
+When the watch-local HealthService activity mask contains `HealthActivitySleep` or `HealthActivityRestfulSleep`, draw only:
+- the weekday/month/day date at its existing top-left position;
+- the local 24-hour HH:mm clock at its existing position;
+- the watch battery at its existing top-right position;
+- current heart rate, its graph, and the graph minimum/maximum at their existing positions;
+- total sleep in the metric position immediately left of the clock;
+- restful sleep in the metric position immediately right of the clock.
+
+Suppress the phone battery, phone/Bluetooth connection indicator, alarm/bedtime, all configurable/remote metrics, image, focus rows, and calendar rows. Do not consume AppMessage payloads, redraw for phone connection/resize events, or persist display/health cache state while sleeping. Keep updates on the existing minute cadence, preserve the existing watch-local battery sensor, and skip the step-count HealthService query while sleeping. No wrist detection is part of this mode. If the current activity state is unavailable, fail open to normal mode rather than assuming sleep.

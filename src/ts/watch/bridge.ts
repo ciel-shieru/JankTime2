@@ -56,6 +56,7 @@ export const displayState: BridgeDisplayState = {
 type MessageValue = string | number | ArrayBuffer;
 type IncomingMessage = Map<string | number, MessageValue>;
 let redraw: (() => void) | null = null;
+let lowPowerMode = false;
 let hasLoggedFirstIncomingMessage = false;
 
 const RECEIVER_LOG_PREFIX = "[JankTime2Receiver]";
@@ -201,10 +202,18 @@ function persistDisplayState(): void {
 }
 
 function changed(): boolean {
+    if (lowPowerMode) return false;
     persistDisplayState();
     if (redraw === null) return false;
     redraw();
     return true;
+}
+
+export function setBridgeLowPowerMode(active: boolean): void {
+    if (lowPowerMode === active) return;
+    lowPowerMode = active;
+    // Flush the last-known display state only after leaving sleep mode.
+    if (!lowPowerMode) persistDisplayState();
 }
 
 restoreDisplayState();
@@ -392,6 +401,9 @@ const message = new Message({
         ["EXTRA", 10004],
     ]),
     onReadable() {
+        // The sleeping display has no phone dependency. Skip decoding, logging,
+        // flash writes and redraws for companion packets until the watch wakes.
+        if (lowPowerMode) return;
         try {
             const incoming = this.read();
             if (!hasLoggedFirstIncomingMessage) {

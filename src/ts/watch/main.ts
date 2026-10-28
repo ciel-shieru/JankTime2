@@ -9,7 +9,7 @@ import {
     type MetricId,
     type SlotId,
 } from "./model";
-import { displayState, setBridgeRedraw } from "./bridge";
+import { displayState, setBridgeLowPowerMode, setBridgeRedraw } from "./bridge";
 import { PREVIEW_MODE } from "./config";
 import { MDI_ICON_MASKS, type MdiIconName } from "./mdi-icons";
 import { formatSleepMinutes, formatSteps, readHealthSnapshot, type NativeHealthSnapshot } from "./health";
@@ -31,6 +31,7 @@ const clockFont = new render.Font("Leco-Bold", 36);
 
 let lastDate = new Date();
 let watchBatteryPercent: number | null = null;
+let lowPowerMode = false;
 
 // These are visual test fixtures only; provider integrations will replace them.
 const previewPhoneBatteryPercent = 83;
@@ -177,6 +178,12 @@ function refreshHealthForMinute(date: Date): void {
     lastHealthMinute = key;
     lastHealthHistoryMinutes = historyMinutes;
     nativeHealth = readHealthSnapshot(historyMinutes);
+    // Unknown/unavailable activity state fails open to the normal watchface.
+    const nextLowPowerMode = !nativeHealth.sleepStateStale && nativeHealth.isSleeping;
+    if (nextLowPowerMode !== lowPowerMode) {
+        lowPowerMode = nextLowPowerMode;
+        setBridgeLowPowerMode(lowPowerMode);
+    }
 }
 
 function nativeHealthMetric(metric: MetricId): { value: string; stale: boolean } | null {
@@ -187,6 +194,18 @@ function nativeHealthMetric(metric: MetricId): { value: string; stale: boolean }
         case "restfulSleep": return { value: formatSleepMinutes(nativeHealth.restfulSleepMinutes), stale: nativeHealth.restfulSleepStale };
         default: return null;
     }
+}
+
+function drawLocalSleepMetric(
+    metric: "totalSleep" | "restfulSleep",
+    cx: number,
+    iconY: number,
+    valueY: number,
+    maxWidth: number,
+): void {
+    const localReading = nativeHealthMetric(metric);
+    drawMetricIcon(metric, cx, iconY, localReading?.stale ?? true);
+    centered(clipped(localReading?.value ?? "--", valueFont, maxWidth), valueFont, black, cx, valueY);
 }
 
 function drawMetric(slot: SlotId, cx: number, iconY: number, valueY: number, maxWidth: number): void {
@@ -272,22 +291,29 @@ function drawRows(): void {
     drawBaseline(clipped(events[0] ?? "", statusFont, 190), statusFont, black, 6, 207);
     drawBaseline(clipped(events[1] ?? "", statusFont, 190), statusFont, black, 6, 221);
 }
-function drawStatus(date: Date): void {
+function drawStatus(date: Date, sleeping: boolean): void {
     const statusCenterY = 10;
     const dateText = labelDate(date);
     centeredAtY(dateText, statusFont, black, 5 + render.getTextWidth(dateText, statusFont) / 2, statusCenterY);
+
+    // Size the watch battery outline for its numeric value in either mode.
+    const batteryTextWidth = render.getTextWidth("100", statusFont);
+    const batteryWidth = Math.ceil((batteryTextWidth + 2) * 16 / 8);
+    const batteryHeight = Math.ceil((statusFont.height + 2) * 16 / 6);
+    const rightBatteryCx = Math.floor(render.width - 1 - batteryWidth * 7 / 16);
+    if (sleeping) {
+        // Retain only watch-local status: date and watch battery.
+        drawBattery(rightBatteryCx, statusCenterY, batteryWidth, batteryHeight, watchBatteryPercent, blue);
+        line(5, 20, render.width - 5, 20, black);
+        return;
+    }
+
     const previewAlarm = PREVIEW_MODE ? formatTime24(previewAlarmAt) : null;
     const alarmTime = displayState.alarmTime ?? previewAlarm ?? "--:--";
     const bedtime = displayState.alarmTime !== null
         ? displayState.alarmIsBedtime
         : PREVIEW_MODE && previewBedtimeAt !== null && previewBedtimeAt.getTime() < previewAlarmAt.getTime();
 
-    // MDI battery outline's clear body is approximately 8/16 width by 6/16 height.
-    // Size from the widest valid percentage at statusFont, with 1px padding.
-    const batteryTextWidth = render.getTextWidth("100", statusFont);
-    const batteryWidth = Math.ceil((batteryTextWidth + 2) * 16 / 8);
-    const batteryHeight = Math.ceil((statusFont.height + 2) * 16 / 6);
-    const rightBatteryCx = Math.floor(render.width - 1 - batteryWidth * 7 / 16);
     const leftBatteryCx = rightBatteryCx - batteryWidth - 2;
     const bluetoothCenterX = Math.floor(leftBatteryCx - batteryWidth * 7 / 16 - 4);
     const alarmCenterX = bluetoothCenterX - 7;
@@ -312,7 +338,16 @@ function draw(event?: AlloyWatchMinuteEvent): void {
     refreshHealthForMinute(lastDate);
     render.begin();
     render.fillRectangle(paper, 0, 0, render.width, render.height);
-    drawStatus(lastDate);
+    drawStatus(lastDate, lowPowerMode);
+
+    if (lowPowerMode) {
+        centered(formatTime24(lastDate), clockFont, black, 100, 135);
+        drawLocalSleepMetric("totalSleep", 20, 108, 134, 36);
+        drawLocalSleepMetric("restfulSleep", 180, 108, 134, 36);
+        drawHeartRate();
+        render.end();
+        return;
+    }
 
     const rowOne = [
         ["grid.top.1", 20], ["grid.top.2", 60], ["grid.top.3", 100],
@@ -337,8 +372,11 @@ function draw(event?: AlloyWatchMinuteEvent): void {
 const battery = new Battery({
     onSample() {
         try {
-            watchBatteryPercent = Math.max(0, Math.min(100, Math.trunc(this.sample().percent)));
-            draw();
+            const nextPercent = Math.max(0, Math.min(100, Math.trunc(this.sample().percent)));
+            if (nextPercent !== watchBatteryPercent) {
+                watchBatteryPercent = nextPercent;
+                draw();
+            }
         } catch {
             // Preserve the last sample if the sensor briefly fails.
         }
@@ -347,10 +385,10 @@ const battery = new Battery({
 try {
     watchBatteryPercent = Math.max(0, Math.min(100, Math.trunc(battery.sample().percent)));
 } catch {
-    watchBatteryPercent = 0;
+    watchBatteryPercent = null;
 }
 
 setBridgeRedraw(() => draw());
 watch.addEventListener("minutechange", draw);
-watch.addEventListener("connected", () => draw());
-watch.addEventListener("resize", () => draw());
+watch.addEventListener("connected", () => { if (!lowPowerMode) draw(); });
+watch.addEventListener("resize", () => { if (!lowPowerMode) draw(); });

@@ -43,6 +43,13 @@ JankTime2 is a TypeScript + Core Devices/RePebble Alloy watchface for the Pebble
 - Text overflow in focus and calendar rows is abrupt clipping/truncation. Do not append ellipses.
 - The clock's left-side robot 3/5 metric is intentionally out of scope for the first implementation. Keep the slot configurable and permit none.
 
+## Sleep-triggered low-power mode
+
+- Use only Pebble Health's watch-local current activity mask to detect sleep; include sleep/restful-sleep activity bits and fail open if activity state is unavailable. Do not add wrist detection or phone-side sleep flags.
+- In sleep mode render only date/time, watch battery, heart rate/graph, total sleep, and restful sleep. Keep clock/date/watch-battery/heart-rate geometry unchanged; place total sleep immediately left and restful sleep immediately right of the clock. Hide all phone-derived/remote metrics, phone status, image, focus, and calendar rows.
+- Keep the existing minute event as the detection cadence; do not add a higher-frequency timer or allocate a HealthService event subscription solely for sleep detection.
+- Skip unnecessary step-count queries, phone AppMessage processing, display-cache writes, and redundant redraws while asleep. On waking, flush pending display state and restore the approved normal layout. No phone data is required to render low-power mode.
+
 ## Security and reliability requirements
 
 - HTTPS only for remote endpoints. Never disable certificate validation or use trust-all TLS managers.

@@ -14,9 +14,10 @@ enum {
   METRIC_TOTAL_SLEEP_MINUTES = 1,
   METRIC_RESTFUL_SLEEP_MINUTES = 2,
   METRIC_CURRENT_HEART_RATE = 3,
+  METRIC_IS_SLEEPING = 4,
 };
 
-static int32_t s_metric_values[4] = { -1, -1, -1, -1 };
+static int32_t s_metric_values[5] = { -1, -1, -1, -1, -1 };
 static int32_t s_heart_samples[HEALTH_SAMPLE_CAPACITY];
 static int32_t s_heart_sample_count = 0;
 static uint8_t s_valid_heart_rates[MAX_HEALTH_HISTORY_MINUTES];
@@ -27,16 +28,32 @@ int32_t health_refresh(int32_t history_minutes) {
   s_metric_values[METRIC_TOTAL_SLEEP_MINUTES] = -1;
   s_metric_values[METRIC_RESTFUL_SLEEP_MINUTES] = -1;
   s_metric_values[METRIC_CURRENT_HEART_RATE] = -1;
+  s_metric_values[METRIC_IS_SLEEPING] = -1;
   s_heart_sample_count = 0;
 
 #if defined(PBL_HEALTH)
   const time_t now = time(NULL);
-  const time_t start_of_today = time_start_of_today();
-  const HealthServiceAccessibilityMask steps_access =
-      health_service_metric_accessible(HealthMetricStepCount, start_of_today, now);
-  if (steps_access & HealthServiceAccessibilityMaskAvailable) {
-    const HealthValue steps = health_service_sum_today(HealthMetricStepCount);
-    if (steps >= 0) s_metric_values[METRIC_STEP_COUNT] = (int32_t)steps;
+  const time_t activity_start = now - (24 * 60 * 60);
+  const HealthActivityMask sleep_activities =
+      HealthActivitySleep | HealthActivityRestfulSleep;
+  const HealthServiceAccessibilityMask activity_access =
+      health_service_any_activity_accessible(sleep_activities, activity_start, now);
+  if (activity_access & HealthServiceAccessibilityMaskAvailable) {
+    const HealthActivityMask active_activities = health_service_peek_current_activities();
+    s_metric_values[METRIC_IS_SLEEPING] =
+        (active_activities & sleep_activities) != 0 ? 1 : 0;
+  }
+
+  // Step totals are not displayed in low-power mode; avoid querying them while
+  // the local HealthService activity state says the user is asleep.
+  if (s_metric_values[METRIC_IS_SLEEPING] != 1) {
+    const time_t start_of_today = time_start_of_today();
+    const HealthServiceAccessibilityMask steps_access =
+        health_service_metric_accessible(HealthMetricStepCount, start_of_today, now);
+    if (steps_access & HealthServiceAccessibilityMaskAvailable) {
+      const HealthValue steps = health_service_sum_today(HealthMetricStepCount);
+      if (steps >= 0) s_metric_values[METRIC_STEP_COUNT] = (int32_t)steps;
+    }
   }
 
   const time_t sleep_start = now - (24 * 60 * 60);
@@ -110,7 +127,7 @@ int32_t health_refresh(int32_t history_minutes) {
 }
 
 int32_t health_metric(int32_t metric) {
-  if (metric < METRIC_STEP_COUNT || metric > METRIC_CURRENT_HEART_RATE) return -1;
+  if (metric < METRIC_STEP_COUNT || metric > METRIC_IS_SLEEPING) return -1;
   return s_metric_values[metric];
 }
 
