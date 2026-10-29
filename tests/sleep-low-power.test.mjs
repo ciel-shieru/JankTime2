@@ -71,6 +71,6 @@ test("documentation excludes wrist detection and records the local-only layout",
     const adr = read("../docs/adr/ADR-0019-sleep-triggered-low-power-mode.md");
     assert.match(readme, /Sleep-triggered low-power mode/);
     assert.match(layout, /Sleep-triggered low-power mode/);
-    assert.match(adr, /No wrist detection/);
+    assert.match(adr, /does not implement or depend on wrist detection/);
     assert.match(adr, /HealthActivitySleep/);
 });
