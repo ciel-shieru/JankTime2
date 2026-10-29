@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "distribution": "ubuntu-24.04",
+  "suite": "noble",
+  "architecture": "amd64",
+  "snapshot": "20261025T170000Z",
+  "packages": {
+    "libsdl2-2.0-0": "2.30.0+dfsg-1ubuntu3.1",
+    "libglib2.0-0t64": "2.80.0-6ubuntu3.10",
+    "libpixman-1-0": "0.42.2-1build1",
+    "zlib1g": "1:1.3.dfsg-3.1ubuntu2.3",
+    "libsndio7.0": "1.9.0-0.3build3",
+    "xvfb": "2:21.1.12-1ubuntu1.9"
+  }
+}

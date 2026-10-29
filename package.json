@@ -1,0 +1,61 @@
+{
+  "name": "janktime2",
+  "author": "ciel-shieru",
+  "version": "0.1.0",
+  "description": "Pebble Time 2 (emery) TypeScript + Alloy watchface",
+  "keywords": [
+    "pebble-app",
+    "watchface",
+    "alloy",
+    "typescript",
+    "emery"
+  ],
+  "private": true,
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "lint": "node scripts/lint.mjs",
+    "typecheck": "tsc --project tsconfig.watch.json --noEmit",
+    "build:watch": "tsc --project tsconfig.watch.json",
+    "test": "node --test tests/*.test.mjs",
+    "enable-preview": "node scripts/enable-preview.mjs"
+  },
+  "pebble": {
+    "displayName": "JankTime2",
+    "uuid": "5448a6a5-e5c9-4692-ae14-3fbdf0497e8e",
+    "projectType": "moddable",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": [
+      "emery"
+    ],
+    "watchapp": {
+      "watchface": true
+    },
+    "messageKeys": [
+      "TYPE",
+      "ID",
+      "VALUE",
+      "FLAGS",
+      "EXTRA"
+    ],
+    "resources": {
+      "media": []
+    },
+    "companionApp": {
+      "android": {
+        "url": "https://github.com/ciel-shieru/JankTime2",
+        "apps": [
+          {
+            "package": "com.cielshieru.janktime2"
+          }
+        ]
+      }
+    },
+    "capabilities": [
+      "health"
+    ]
+  }
+}
