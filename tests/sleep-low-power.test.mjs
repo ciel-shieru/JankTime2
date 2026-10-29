@@ -16,6 +16,16 @@ test("sleep state is watch-local and activity API is availability-guarded", () =
     assert.match(ffi, /metric > METRIC_IS_SLEEPING/);
 });
 
+test("initial native health state treats sleep status as unknown", () => {
+    const main = read("../src/ts/watch/main.ts");
+    const initializerStart = main.indexOf("let nativeHealth: NativeHealthSnapshot = {");
+    const initializerEnd = main.indexOf("\n};", initializerStart);
+    assert.ok(initializerStart >= 0 && initializerEnd > initializerStart, "Expected the native health initializer");
+    const initializer = main.slice(initializerStart, initializerEnd);
+    assert.match(initializer, /isSleeping: false/);
+    assert.match(initializer, /sleepStateStale: true/);
+});
+
 test("sleep-state snapshot fails open and avoids flash writes during sleep", () => {
     const health = read("../src/ts/watch/health.ts");
     assert.match(health, /Natives\.health_metric\(4\)/);

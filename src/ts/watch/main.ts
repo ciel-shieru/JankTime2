@@ -161,6 +161,10 @@ let nativeHealth: NativeHealthSnapshot = {
     restfulSleepMinutes: null,
     currentBpm: null,
     heartSamples: [],
+    // Start conservatively: use normal mode until HealthService returns
+    // an accessible, current activity state.
+    isSleeping: false,
+    sleepStateStale: true,
     stepsStale: true,
     totalSleepStale: true,
     restfulSleepStale: true,
